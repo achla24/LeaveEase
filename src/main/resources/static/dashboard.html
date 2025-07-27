@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Leave Management Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1>Employee Leave Management</h1>
+            <div class="user-profile">
+                <div class="user-avatar"></div>
+                <span class="user-name">Olushesi Azeez</span>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">
+                <span class="tab-icon">📊</span>
+                Dashboard
+            </button>
+            <button class="nav-tab" data-tab="request-leave">
+                <span class="tab-icon">📝</span>
+                Request Leave
+            </button>
+            <button class="nav-tab" data-tab="calendar">
+                <span class="tab-icon">📅</span>
+                Calendar
+            </button>
+            <button class="nav-tab" data-tab="history">
+                <span class="tab-icon">📋</span>
+                History
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <!-- Statistics Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Leave Taken</span>
+                            <span class="stat-icon">📊</span>
+                        </div>
+                        <div class="stat-value" id="totalLeaveTaken">16 days</div>
+                        <div class="stat-subtitle" id="remainingDays">29 days remaining this year</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Approval Rate</span>
+                            <span class="stat-icon">⏰</span>
+                        </div>
+                        <div class="stat-value" id="approvalRate">92%</div>
+                        <div class="stat-subtitle">29 days remaining this year</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Pending Request</span>
+                            <span class="stat-icon">📋</span>
+                        </div>
+                        <div class="stat-value" id="pendingRequests">1</div>
+                        <div class="stat-subtitle">29 days remaining this year</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Team Member on Leave</span>
+                            <span class="stat-icon">👥</span>
+                        </div>
+                        <div class="stat-value" id="teamMembersOnLeave">2</div>
+                        <div class="stat-subtitle">29 days remaining this year</div>
+                    </div>
+                </div>
+
+                <!-- Content Grid -->
+                <div class="content-grid">
+                    <!-- Leave Overview Chart -->
+                    <div class="chart-section">
+                        <h3>Leave Overview</h3>
+                        <p class="chart-subtitle">29 days breakdown for the current year</p>
+                        <div class="chart-container">
+                            <canvas id="leaveChart"></canvas>
+                        </div>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: #4F46E5;"></span>
+                                <span>Leave days taken</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: #E5E7EB;"></span>
+                                <span>Remaining</span>
+                            </div>
+                        </div>
+                        <div class="chart-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Total days</span>
+                                <span class="summary-value" id="chartTotalDays">20</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Remaining</span>
+                                <span class="summary-value" id="chartRemainingDays">29</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upcoming Leave -->
+                    <div class="upcoming-section">
+                        <h3>Upcoming Leave</h3>
+                        <p class="section-subtitle">Your scheduled time off</p>
+                        <div id="upcomingLeaveList" class="upcoming-list">
+                            <!-- Dynamic content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Grid -->
+                <div class="bottom-grid">
+                    <!-- Notifications -->
+                    <div class="notifications-section">
+                        <h3>Notifications</h3>
+                        <p class="section-subtitle">Recent update and alerts</p>
+                        <div id="notificationsList" class="notifications-list">
+                            <!-- Dynamic content will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Team Members on Leave -->
+                    <div class="team-section">
+                        <h3>Team Member on Leave</h3>
+                        <p class="section-subtitle">Colleagues currently or soon to be on leave</p>
+                        <div id="teamOnLeaveList" class="team-list">
+                            <!-- Dynamic content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Request Leave Tab -->
+            <div id="request-leave" class="tab-content">
+                <div class="form-container">
+                    <h2>Request Leave</h2>
+                    <form id="leaveForm" class="leave-form">
+                        <div class="form-group">
+                            <label for="employeeName">Employee Name</label>
+                            <input type="text" id="employeeName" name="employeeName" required>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="startDate">Start Date</label>
+                                <input type="date" id="startDate" name="startDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="endDate">End Date</label>
+                                <input type="date" id="endDate" name="endDate" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="leaveType">Leave Type</label>
+                            <select id="leaveType" name="leaveType" required>
+                                <option value="Annual">Annual Leave</option>
+                                <option value="Sick">Sick Leave</option>
+                                <option value="Personal">Personal Leave</option>
+                                <option value="Emergency">Emergency Leave</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reason">Reason for Leave</label>
+                            <textarea id="reason" name="reason" rows="4" required></textarea>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="calendar" class="tab-content">
+                <div class="calendar-container">
+                    <h2>Leave Calendar</h2>
+                    <p>Calendar view coming soon...</p>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div id="history" class="tab-content">
+                <div class="history-container">
+                    <h2>Leave History</h2>
+                    <div class="table-container">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Duration</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <!-- Dynamic content will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
