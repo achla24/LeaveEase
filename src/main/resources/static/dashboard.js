@@ -1,15 +1,158 @@
 // Dashboard JavaScript
 class LeaveDashboard {
     constructor() {
-        this.baseURL = 'http://localhost:8080';
+        this.baseURL = 'http://localhost:9090';
         this.chart = null;
+        this.userRole = this.getUserRole(); // Get user role from URL or session
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.setupRoleBasedUI();
         this.loadDashboardData();
         this.setupTabNavigation();
+    }
+    
+    getUserRole() {
+        // Get role from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('role') || 'employee';
+    }
+    
+    setupRoleBasedUI() {
+        // Update user role display
+        this.updateUserInfo();
+        
+        // Show/hide HR-specific sections based on role
+        if (this.userRole === 'hr') {
+            this.showHRFeatures();
+            this.loadHRData();
+        } else {
+            this.hideHRFeatures();
+        }
+    }
+    
+    updateUserInfo() {
+        const userRoleElement = document.getElementById('userRole');
+        if (userRoleElement) {
+            userRoleElement.textContent = this.userRole === 'hr' ? 'HR Manager' : 'Employee';
+            userRoleElement.className = `user-role ${this.userRole}-role`;
+        }
+    }
+    
+    showHRFeatures() {
+        // Add HR-specific stats cards
+        this.addHRStatsCards();
+        
+        // Add HR tab if not exists
+        this.addHRTab();
+        
+        // Show approve/reject buttons in history
+        document.body.classList.add('hr-user');
+    }
+    
+    hideHRFeatures() {
+        // Hide HR-specific elements
+        document.body.classList.add('employee-user');
+        
+        // Hide approve/reject buttons
+        const actionButtons = document.querySelectorAll('.action-btn');
+        actionButtons.forEach(btn => btn.style.display = 'none');
+    }
+    
+    addHRStatsCards() {
+        const statsContainer = document.querySelector('.stats-grid');
+        if (statsContainer && !document.getElementById('hrStatsCards')) {
+            const hrStatsHTML = `
+                <div id="hrStatsCards" class="hr-stats-section">
+                    <div class="stat-card hr-stat">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="totalEmployeesCount">0</div>
+                            <div class="stat-label">Total Employees</div>
+                            <div class="stat-subtitle">Active workforce</div>
+                        </div>
+                    </div>
+                    <div class="stat-card hr-stat">
+                        <div class="stat-icon">🏠</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="employeesOnLeaveCount">0</div>
+                            <div class="stat-label">On Leave</div>
+                            <div class="stat-subtitle">Currently away</div>
+                        </div>
+                    </div>
+                    <div class="stat-card hr-stat">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="employeesPresentCount">0</div>
+                            <div class="stat-label">Present</div>
+                            <div class="stat-subtitle">Available today</div>
+                        </div>
+                    </div>
+                    <div class="stat-card hr-stat">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="pendingApprovalsCount">0</div>
+                            <div class="stat-label">Pending Approvals</div>
+                            <div class="stat-subtitle">Awaiting decision</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            statsContainer.insertAdjacentHTML('beforeend', hrStatsHTML);
+        }
+    }
+    
+    addHRTab() {
+        const navTabs = document.querySelector('.nav-tabs');
+        const tabContents = document.querySelector('.dashboard-content');
+        
+        if (navTabs && !document.querySelector('[data-tab="hr-management"]')) {
+            // Add HR tab button
+            const hrTabButton = document.createElement('button');
+            hrTabButton.className = 'nav-tab';
+            hrTabButton.setAttribute('data-tab', 'hr-management');
+            hrTabButton.innerHTML = `
+                <span class="tab-icon">👨‍💼</span>
+                HR Management
+            `;
+            navTabs.appendChild(hrTabButton);
+            
+            // Add HR tab content
+            const hrTabContent = document.createElement('div');
+            hrTabContent.id = 'hr-management';
+            hrTabContent.className = 'tab-content';
+            hrTabContent.innerHTML = `
+                <div class="hr-management-section">
+                    <h2>HR Management Dashboard</h2>
+                    
+                    <div class="hr-actions">
+                        <div class="hr-section">
+                            <h3>📋 Pending Leave Requests</h3>
+                            <div id="pendingRequestsList" class="pending-requests-list">
+                                <!-- Pending requests will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <div class="hr-section">
+                            <h3>📊 Department Overview</h3>
+                            <div id="departmentStats" class="department-stats">
+                                <!-- Department stats will be loaded here -->
+                            </div>
+                        </div>
+                        
+                        <div class="hr-section">
+                            <h3>📈 Leave Analytics</h3>
+                            <div id="leaveAnalytics" class="leave-analytics">
+                                <!-- Analytics will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            tabContents.appendChild(hrTabContent);
+        }
     }
 
     setupEventListeners() {
@@ -39,6 +182,8 @@ class LeaveDashboard {
                 // Load specific data for the tab
                 if (targetTab === 'history') {
                     this.loadHistoryData();
+                } else if (targetTab === 'hr-management' && this.userRole === 'hr') {
+                    this.loadHRData();
                 }
             });
         });
@@ -81,7 +226,9 @@ class LeaveDashboard {
 
     async loadQuarterlyData() {
         try {
+            // this line will ask java backend for the data of q1,q2,q3,q4
             const response = await fetch(`${this.baseURL}/api/dashboard/quarterly-data`);
+        //  this will call the data
             const data = await response.json();
             
             this.createChart(data);
@@ -375,6 +522,117 @@ class LeaveDashboard {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays + 1; // Include both start and end dates
     }
+    
+    // ========== HR-SPECIFIC METHODS ==========
+    
+    async loadHRData() {
+        if (this.userRole !== 'hr') return;
+        
+        try {
+            await Promise.all([
+                this.loadHRStats(),
+                this.loadPendingRequests(),
+                this.loadDepartmentStats()
+            ]);
+        } catch (error) {
+            console.error('Error loading HR data:', error);
+        }
+    }
+    
+    async loadHRStats() {
+        try {
+            const response = await fetch(`${this.baseURL}/api/dashboard/hr/employee-stats`);
+            const stats = await response.json();
+            
+            // Update HR-specific stat cards
+            document.getElementById('totalEmployeesCount').textContent = stats.totalEmployees;
+            document.getElementById('employeesOnLeaveCount').textContent = stats.employeesOnLeave;
+            document.getElementById('employeesPresentCount').textContent = stats.employeesPresent;
+            document.getElementById('pendingApprovalsCount').textContent = stats.pendingApprovals;
+            
+        } catch (error) {
+            console.error('Error loading HR stats:', error);
+        }
+    }
+    
+    async loadPendingRequests() {
+        try {
+            const response = await fetch(`${this.baseURL}/api/dashboard/hr/pending-requests`);
+            const pendingRequests = await response.json();
+            
+            const container = document.getElementById('pendingRequestsList');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (pendingRequests.length === 0) {
+                container.innerHTML = '<p class="no-data">No pending requests</p>';
+                return;
+            }
+            
+            pendingRequests.forEach(request => {
+                const requestCard = document.createElement('div');
+                requestCard.className = 'pending-request-card';
+                
+                requestCard.innerHTML = `
+                    <div class="request-header">
+                        <h4>${request.employeeName}</h4>
+                        <span class="request-date">${this.formatDate(request.startDate)} - ${this.formatDate(request.endDate)}</span>
+                    </div>
+                    <div class="request-details">
+                        <p><strong>Type:</strong> ${request.leaveType}</p>
+                        <p><strong>Duration:</strong> ${request.duration} days</p>
+                        <p><strong>Reason:</strong> ${request.reason}</p>
+                    </div>
+                    <div class="request-actions">
+                        <button class="action-btn approve-btn" onclick="dashboard.updateLeaveStatus('${request.id}', 'approve')">
+                            ✅ Approve
+                        </button>
+                        <button class="action-btn reject-btn" onclick="dashboard.updateLeaveStatus('${request.id}', 'reject')">
+                            ❌ Reject
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(requestCard);
+            });
+            
+        } catch (error) {
+            console.error('Error loading pending requests:', error);
+        }
+    }
+    
+    async loadDepartmentStats() {
+        try {
+            const response = await fetch(`${this.baseURL}/api/dashboard/hr/department-stats`);
+            const stats = await response.json();
+            
+            const container = document.getElementById('departmentStats');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            const departmentLeaves = stats.departmentLeaves;
+            
+            Object.entries(departmentLeaves).forEach(([department, leaves]) => {
+                const deptCard = document.createElement('div');
+                deptCard.className = 'department-card';
+                
+                deptCard.innerHTML = `
+                    <div class="dept-name">${department}</div>
+                    <div class="dept-leaves">${leaves} days</div>
+                    <div class="dept-bar">
+                        <div class="dept-bar-fill" style="width: ${(leaves / 20) * 100}%"></div>
+                    </div>
+                `;
+                
+                container.appendChild(deptCard);
+            });
+            
+        } catch (error) {
+            console.error('Error loading department stats:', error);
+        }
+    }
 }
 
 // Initialize dashboard when DOM is loaded
@@ -384,3 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Make dashboard available globally for button onclick handlers
 window.dashboard = null;
+
+// Global logout function
+function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        window.location.href = '/logout';
+    }
+}

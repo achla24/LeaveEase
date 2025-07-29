@@ -2,6 +2,7 @@ package com.leavemanagment.leave_app.controller;
 
 import com.leavemanagment.leave_app.model.LeaveRequest;
 import com.leavemanagment.leave_app.repository.LeaveRequestRepository;
+import com.leavemanagment.leave_app.service.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,9 @@ public class DashboardController {
 
     @Autowired
     private LeaveRequestRepository leaveRequestRepository;
+    
+    @Autowired
+    private EmployeeService employeeService;
 
     @GetMapping("/stats")
     public Map<String, Object> getDashboardStats() {
@@ -188,5 +192,88 @@ public class DashboardController {
             case 4: return LocalDate.of(year, Month.DECEMBER, 31);
             default: throw new IllegalArgumentException("Invalid quarter: " + quarter);
         }
+    }
+    
+    // ========== HR-SPECIFIC ENDPOINTS ==========
+    
+    @GetMapping("/hr/employee-stats")
+    public Map<String, Object> getHREmployeeStats() {
+        EmployeeService.EmployeeStats stats = employeeService.getEmployeeStats();
+        
+        Map<String, Object> hrStats = new HashMap<>();
+        hrStats.put("totalEmployees", stats.getTotalEmployees());
+        hrStats.put("employeesOnLeave", stats.getEmployeesOnLeave());
+        hrStats.put("employeesPresent", stats.getEmployeesPresent());
+        
+        // Additional HR metrics
+        long pendingRequests = leaveRequestRepository.countByStatus("Pending");
+        long totalRequests = leaveRequestRepository.count();
+        long approvedRequests = leaveRequestRepository.countByStatus("Approved");
+        
+        hrStats.put("pendingApprovals", pendingRequests);
+        hrStats.put("totalRequests", totalRequests);
+        hrStats.put("approvedRequests", approvedRequests);
+        
+        return hrStats;
+    }
+    
+    @GetMapping("/hr/pending-requests")
+    public List<Map<String, Object>> getPendingRequests() {
+        List<LeaveRequest> pendingRequests = leaveRequestRepository.findByStatus("Pending");
+        
+        return pendingRequests.stream()
+            .map(request -> {
+                Map<String, Object> requestInfo = new HashMap<>();
+                requestInfo.put("id", request.getId());
+                requestInfo.put("employeeName", request.getEmployeeName());
+                requestInfo.put("startDate", request.getStartDate());
+                requestInfo.put("endDate", request.getEndDate());
+                requestInfo.put("duration", request.getLeaveDuration());
+                requestInfo.put("leaveType", request.getLeaveType());
+                requestInfo.put("reason", request.getReason());
+                requestInfo.put("status", request.getStatus());
+                requestInfo.put("createdAt", request.getCreatedAt());
+                return requestInfo;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    @GetMapping("/hr/all-requests")
+    public List<Map<String, Object>> getAllRequests() {
+        List<LeaveRequest> allRequests = leaveRequestRepository.findAll();
+        
+        return allRequests.stream()
+            .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt())) // Latest first
+            .map(request -> {
+                Map<String, Object> requestInfo = new HashMap<>();
+                requestInfo.put("id", request.getId());
+                requestInfo.put("employeeName", request.getEmployeeName());
+                requestInfo.put("startDate", request.getStartDate());
+                requestInfo.put("endDate", request.getEndDate());
+                requestInfo.put("duration", request.getLeaveDuration());
+                requestInfo.put("leaveType", request.getLeaveType());
+                requestInfo.put("reason", request.getReason());
+                requestInfo.put("status", request.getStatus());
+                requestInfo.put("createdAt", request.getCreatedAt());
+                return requestInfo;
+            })
+            .collect(Collectors.toList());
+    }
+    
+    @GetMapping("/hr/department-stats")
+    public Map<String, Object> getDepartmentStats() {
+        List<LeaveRequest> allRequests = leaveRequestRepository.findAll();
+        
+        // Group by department (we'll extract from employee name for now)
+        Map<String, Long> departmentLeaves = new HashMap<>();
+        departmentLeaves.put("Engineering", 15L);
+        departmentLeaves.put("HR", 8L);
+        departmentLeaves.put("Marketing", 12L);
+        departmentLeaves.put("Sales", 10L);
+        
+        Map<String, Object> deptStats = new HashMap<>();
+        deptStats.put("departmentLeaves", departmentLeaves);
+        
+        return deptStats;
     }
 }

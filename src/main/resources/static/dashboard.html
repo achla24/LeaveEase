@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Employee Leave Management Dashboard</title>
     <link rel="stylesheet" href="dashboard.css">
+    <!-- here cdn is content deilovery network which directlt acess this page to the chart library-->
+    <!-- it's like saying Hey browser! Please bring in Chart.js from the internet so I can draw charts easily.” -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -12,9 +14,18 @@
         <!-- Header -->
         <header class="dashboard-header">
             <h1>Employee Leave Management</h1>
-            <div class="user-profile">
-                <div class="user-avatar"></div>
-                <span class="user-name">Olushesi Azeez</span>
+            <div class="header-actions">
+                <div class="user-profile">
+                    <div class="user-avatar"></div>
+                    <div class="user-info">
+                        <span class="user-name" id="userName">User</span>
+                        <span class="user-role" id="userRole">Employee</span>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    <span>🚪</span>
+                    Logout
+                </button>
             </div>
         </header>
 
