@@ -1,4 +1,5 @@
 package com.leavemanagment.leave_app.service;
+import com.leavemanagment.leave_app.model.User;
 
 import com.leavemanagment.leave_app.model.Employee;
 import com.leavemanagment.leave_app.repository.EmployeeRepository;
@@ -114,6 +115,39 @@ public class EmployeeService {
             employeeRepository.saveAll(List.of(emp1, emp2, emp3, emp4, emp5));
         }
     }
+    
+    // Add this method after initializeSampleEmployees() and before the EmployeeStats class
+    public void createEmployeeFromUser(User user) {
+        try {
+            // Check if employee already exists for this user
+            Optional<Employee> existingEmployee = employeeRepository.findByUser(user);
+            if (existingEmployee.isPresent()) {
+                return; // Employee already exists, don't create duplicate
+            }
+            
+            // Create new employee record
+            Employee employee = new Employee();
+            employee.setUser(user);
+            employee.setFullName(user.getFullName());
+            employee.setEmail(user.getEmail());
+            employee.setDepartment(user.getDepartment());
+            
+            // Set default values for new employees
+            employee.setLeaveBalance(20); // 20 days annual leave
+            employee.setJoinDate(LocalDate.now()); // Today's date
+            employee.setActive(true); // Active by default
+            
+            // Save employee to database
+            employeeRepository.save(employee);
+            
+            System.out.println("Created employee record for user: " + user.getUsername());
+            
+        } catch (Exception e) {
+            System.err.println("Error creating employee record: " + e.getMessage());
+            throw new RuntimeException("Failed to create employee record", e);
+        }
+    }
+
     
     // Inner class for employee statistics
     public static class EmployeeStats {

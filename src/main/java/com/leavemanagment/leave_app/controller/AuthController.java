@@ -154,4 +154,54 @@ public class AuthController {
             System.out.println("ℹ️ Users already exist, skipping creation.");
         }
     }
+    
+    // Add this method to AuthController.java (after the existing methods, before the closing brace)
+    @PostMapping("/signup")
+    public String signup(@RequestParam String fullName,
+                        @RequestParam String username, 
+                        @RequestParam String email,
+                        @RequestParam String password,
+                        @RequestParam String department,
+                        @RequestParam String role) {
+        try {
+            // Check if username already exists
+            if (userRepository.findByUsername(username).isPresent()) {
+                return "redirect:/signup.html?error=true&type=username";
+            }
+            
+            // Check if email already exists
+            if (userRepository.findByEmail(email).isPresent()) {
+                return "redirect:/signup.html?error=true&type=email";
+            }
+            
+            // Create new user
+            User newUser = new User();
+            newUser.setUsername(username);
+            newUser.setEmail(email);
+            newUser.setPassword(passwordEncoder.encode(password)); // Encrypt password
+            newUser.setFullName(fullName);
+            newUser.setDepartment(department);
+            
+            // Set role (convert string to Role enum)
+            if ("HR".equals(role)) {
+                newUser.setRole(Role.HR);
+            } else {
+                newUser.setRole(Role.EMPLOYEE);
+            }
+            
+            // Save user to database
+            userRepository.save(newUser);
+            
+            // Create corresponding employee record
+            employeeService.createEmployeeFromUser(newUser);
+            
+            // Redirect to login with success message
+            return "redirect:/login.html?signup=success";
+            
+        } catch (Exception e) {
+            System.err.println("Error during signup: " + e.getMessage());
+            return "redirect:/signup.html?error=true";
+        }
+    }
+
 }
