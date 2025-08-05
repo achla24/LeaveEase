@@ -278,22 +278,69 @@ class LeaveDashboard {
 
     async loadStats() {
         try {
-            const response = await fetch(`${this.baseURL}/api/dashboard/stats`);
-            const stats = await response.json();
+            console.log('📊 Loading user-specific dashboard stats...');
             
+            // Use user-specific stats endpoint
+            const response = await fetch(`${this.baseURL}/api/dashboard/my-stats`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const stats = await response.json();
+            console.log('✅ Loaded user stats:', stats);
+            
+            // Update stat cards with real data
             document.getElementById('totalLeaveTaken').textContent = `${stats.totalLeaveTaken} days`;
             document.getElementById('approvalRate').textContent = `${stats.approvalRate}%`;
             document.getElementById('pendingRequests').textContent = stats.pendingRequests;
             document.getElementById('teamMembersOnLeave').textContent = stats.teamMembersOnLeave;
             
-            // Update remaining days in all stat cards
-            const remainingDaysElements = document.querySelectorAll('.stat-subtitle');
-            remainingDaysElements.forEach(element => {
-                element.textContent = `${stats.remainingDays} days remaining this year`;
+            // Update remaining days in stat cards with personalized messages
+            const remainingDaysElement = document.getElementById('remainingDays');
+            if (remainingDaysElement) {
+                remainingDaysElement.textContent = `${stats.remainingDays} days remaining this year`;
+            }
+            
+            // Update other subtitle elements
+            const statSubtitles = document.querySelectorAll('.stat-subtitle');
+            statSubtitles.forEach((element, index) => {
+                switch (index) {
+                    case 0: // Total Leave Taken
+                        element.textContent = `${stats.remainingDays} days remaining this year`;
+                        break;
+                    case 1: // Approval Rate
+                        element.textContent = stats.totalLeaveTaken > 0 ? 
+                            `Based on ${stats.totalLeaveTaken + stats.pendingRequests} requests` : 
+                            'No requests submitted yet';
+                        break;
+                    case 2: // Pending Requests
+                        element.textContent = stats.pendingRequests > 0 ? 
+                            'Awaiting manager approval' : 
+                            'No pending requests';
+                        break;
+                    case 3: // Team Members on Leave
+                        element.textContent = stats.teamMembersOnLeave > 0 ? 
+                            'Currently on leave today' : 
+                            'All team members present';
+                        break;
+                }
             });
             
         } catch (error) {
             console.error('Error loading stats:', error);
+            
+            // Show error state in stats
+            document.getElementById('totalLeaveTaken').textContent = '-- days';
+            document.getElementById('approvalRate').textContent = '--%';
+            document.getElementById('pendingRequests').textContent = '--';
+            document.getElementById('teamMembersOnLeave').textContent = '--';
+            
+            const statSubtitles = document.querySelectorAll('.stat-subtitle');
+            statSubtitles.forEach(element => {
+                element.textContent = 'Error loading data';
+                element.style.color = '#ef4444';
+            });
         }
     }
 
@@ -373,28 +420,63 @@ class LeaveDashboard {
 
     async loadUpcomingLeaves() {
         try {
-            const response = await fetch(`${this.baseURL}/api/dashboard/upcoming-leaves`);
-            const upcomingLeaves = await response.json();
+            console.log('📅 Loading upcoming leaves for current user...');
+            
+            // Get user's own upcoming leaves from their leave history
+            const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const allUserLeaves = await response.json();
+            
+            // Filter for upcoming approved leaves only
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const upcomingLeaves = allUserLeaves
+                .filter(leave => {
+                    const startDate = new Date(leave.startDate);
+                    return leave.status === 'Approved' && startDate > today;
+                })
+                .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                .slice(0, 5); // Show only next 5
+            
+            console.log('✅ Found ' + upcomingLeaves.length + ' upcoming leaves');
             
             const container = document.getElementById('upcomingLeaveList');
             container.innerHTML = '';
             
             if (upcomingLeaves.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No upcoming leaves scheduled</p>';
+                container.innerHTML = `
+                    <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">📅</div>
+                        <div>No upcoming approved leaves</div>
+                        <div style="font-size: 14px; margin-top: 5px;">Submit a leave request to see it here once approved</div>
+                    </div>
+                `;
                 return;
             }
             
             upcomingLeaves.forEach(leave => {
                 const leaveItem = document.createElement('div');
-                leaveItem.className = `upcoming-item ${leave.status.toLowerCase()}`;
+                leaveItem.className = 'upcoming-item approved';
+                
+                // Calculate days until leave starts
+                const startDate = new Date(leave.startDate);
+                const daysUntil = Math.ceil((startDate - today) / (1000 * 60 * 60 * 24));
                 
                 leaveItem.innerHTML = `
                     <div class="upcoming-header">
-                        <span class="upcoming-title">${leave.leaveType}</span>
-                        <span class="upcoming-status">${leave.status}</span>
+                        <span class="upcoming-title">${leave.leaveType} Leave</span>
+                        <span class="upcoming-status">✅ Approved</span>
                     </div>
                     <div class="upcoming-dates">
-                        ${this.formatDate(leave.startDate)} - ${this.formatDate(leave.endDate)} (${leave.duration} days)
+                        ${this.formatDate(leave.startDate)} - ${this.formatDate(leave.endDate)} (${this.calculateDuration(leave.startDate, leave.endDate)} days)
+                    </div>
+                    <div class="upcoming-countdown" style="font-size: 12px; color: #3b82f6; margin-top: 4px;">
+                        ${daysUntil === 1 ? 'Starts tomorrow' : `Starts in ${daysUntil} days`}
                     </div>
                 `;
                 
@@ -403,6 +485,14 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error('Error loading upcoming leaves:', error);
+            const container = document.getElementById('upcomingLeaveList');
+            container.innerHTML = `
+                <div class="error" style="text-align: center; padding: 20px; color: #ef4444;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                    <div>Error loading upcoming leaves</div>
+                    <div style="font-size: 14px; margin-top: 5px;">${error.message}</div>
+                </div>
+            `;
         }
     }
 
@@ -442,14 +532,42 @@ class LeaveDashboard {
 
     async loadNotifications() {
         try {
-            const response = await fetch(`${this.baseURL}/api/dashboard/notifications`);
-            const notifications = await response.json();
+            console.log('🔔 Loading user-specific notifications...');
+            
+            // Get user's own leave requests for notifications
+            const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const userLeaves = await response.json();
+            
+            // Create notifications from user's recent leave requests
+            const notifications = userLeaves
+                .sort((a, b) => new Date(b.createdAt || b.id) - new Date(a.createdAt || a.id))
+                .slice(0, 5) // Show only 5 most recent
+                .map(leave => ({
+                    id: leave.id,
+                    message: this.generateUserNotificationMessage(leave),
+                    createdAt: leave.createdAt || new Date().toISOString(),
+                    status: leave.status,
+                    leaveType: leave.leaveType
+                }));
+            
+            console.log('✅ Generated ' + notifications.length + ' notifications');
             
             const container = document.getElementById('notificationsList');
             container.innerHTML = '';
             
             if (notifications.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No recent notifications</p>';
+                container.innerHTML = `
+                    <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">🔔</div>
+                        <div>No recent notifications</div>
+                        <div style="font-size: 14px; margin-top: 5px;">Submit leave requests to see updates here</div>
+                    </div>
+                `;
                 return;
             }
             
@@ -457,8 +575,26 @@ class LeaveDashboard {
                 const notificationItem = document.createElement('div');
                 notificationItem.className = 'notification-item';
                 
+                // Choose icon based on status
+                let icon = '📋';
+                let iconColor = '#64748b';
+                switch (notification.status) {
+                    case 'Approved':
+                        icon = '✅';
+                        iconColor = '#22c55e';
+                        break;
+                    case 'Rejected':
+                        icon = '❌';
+                        iconColor = '#ef4444';
+                        break;
+                    case 'Pending':
+                        icon = '⏳';
+                        iconColor = '#f59e0b';
+                        break;
+                }
+                
                 notificationItem.innerHTML = `
-                    <div class="notification-icon"></div>
+                    <div class="notification-icon" style="color: ${iconColor}; font-size: 18px;">${icon}</div>
                     <div class="notification-content">
                         <div class="notification-text">${notification.message}</div>
                         <div class="notification-time">${this.formatDateTime(notification.createdAt)}</div>
@@ -470,6 +606,28 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error('Error loading notifications:', error);
+            const container = document.getElementById('notificationsList');
+            container.innerHTML = `
+                <div class="error" style="text-align: center; padding: 20px; color: #ef4444;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                    <div>Error loading notifications</div>
+                    <div style="font-size: 14px; margin-top: 5px;">${error.message}</div>
+                </div>
+            `;
+        }
+    }
+    
+    generateUserNotificationMessage(leave) {
+        const leaveType = leave.leaveType || 'Leave';
+        switch (leave.status) {
+            case 'Pending':
+                return `Your ${leaveType} request is pending approval`;
+            case 'Approved':
+                return `Your ${leaveType} request has been approved`;
+            case 'Rejected':
+                return `Your ${leaveType} request has been rejected`;
+            default:
+                return `Your ${leaveType} request status updated`;
         }
     }
 

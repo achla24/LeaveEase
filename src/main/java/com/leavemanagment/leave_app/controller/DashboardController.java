@@ -2,8 +2,11 @@ package com.leavemanagment.leave_app.controller;
 
 import com.leavemanagment.leave_app.model.LeaveRequest;
 import com.leavemanagment.leave_app.repository.LeaveRequestRepository;
+import com.leavemanagment.leave_app.repository.UserRepository;
 import com.leavemanagment.leave_app.service.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -21,8 +24,88 @@ public class DashboardController {
     private LeaveRequestRepository leaveRequestRepository;
     
     @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
     private EmployeeService employeeService;
 
+    // USER-SPECIFIC STATS: Get dashboard stats for current logged-in user
+    @GetMapping("/my-stats")
+    public ResponseEntity<Map<String, Object>> getMyDashboardStats(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                System.err.println("❌ No authentication for my-stats request");
+                return ResponseEntity.status(401).build();
+            }
+            
+            String username = authentication.getName();
+            System.out.println("📊 Getting dashboard stats for user: " + username);
+            
+            // Get user's full name
+            Optional<com.leavemanagment.leave_app.model.User> userOpt = userRepository.findByUsername(username);
+            if (!userOpt.isPresent()) {
+                System.err.println("❌ User not found: " + username);
+                return ResponseEntity.notFound().build();
+            }
+            
+            String fullName = userOpt.get().getFullName();
+            System.out.println("👤 Calculating stats for: " + fullName);
+            
+            Map<String, Object> stats = new HashMap<>();
+            
+            // Get current year data for this user only
+            LocalDate currentDate = LocalDate.now();
+            LocalDate yearStart = LocalDate.of(currentDate.getYear(), 1, 1);
+            LocalDate yearEnd = LocalDate.of(currentDate.getYear(), 12, 31);
+            
+            List<LeaveRequest> userRequests = leaveRequestRepository.findByEmployeeName(fullName);
+            List<LeaveRequest> currentYearRequests = userRequests.stream()
+                .filter(request -> request.getStartDate() != null && 
+                        !request.getStartDate().isBefore(yearStart) && 
+                        !request.getStartDate().isAfter(yearEnd))
+                .collect(Collectors.toList());
+            
+            // Calculate total leave days taken (approved requests only)
+            long totalLeaveDays = currentYearRequests.stream()
+                .filter(request -> "Approved".equals(request.getStatus()))
+                .mapToLong(LeaveRequest::getLeaveDuration)
+                .sum();
+            
+            // Calculate approval rate for this user
+            long totalUserRequests = currentYearRequests.size();
+            long approvedUserRequests = currentYearRequests.stream()
+                .filter(request -> "Approved".equals(request.getStatus()))
+                .count();
+            
+            double approvalRate = totalUserRequests > 0 ? (double) approvedUserRequests / totalUserRequests * 100 : 0;
+            
+            // Count pending requests for this user
+            long pendingRequests = currentYearRequests.stream()
+                .filter(request -> "Pending".equals(request.getStatus()))
+                .count();
+            
+            // Count team members currently on leave (all employees)
+            List<LeaveRequest> currentlyOnLeave = leaveRequestRepository.findCurrentlyOnLeave(currentDate);
+            
+            // Calculate remaining days (assuming 25 days annual leave)
+            long remainingDays = Math.max(0, 25 - totalLeaveDays);
+            
+            stats.put("totalLeaveTaken", totalLeaveDays);
+            stats.put("remainingDays", remainingDays);
+            stats.put("approvalRate", Math.round(approvalRate));
+            stats.put("pendingRequests", pendingRequests);
+            stats.put("teamMembersOnLeave", currentlyOnLeave.size());
+            
+            System.out.println("📈 User stats: " + stats);
+            return ResponseEntity.ok(stats);
+            
+        } catch (Exception e) {
+            System.err.println("Error getting user dashboard stats: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // GLOBAL STATS: Get dashboard stats for all users (for HR/Admin)
     @GetMapping("/stats")
     public Map<String, Object> getDashboardStats() {
         Map<String, Object> stats = new HashMap<>();
