@@ -119,33 +119,48 @@ public class EmployeeService {
     // Add this method after initializeSampleEmployees() and before the EmployeeStats class
     public void createEmployeeFromUser(User user) {
         try {
-            // Check if employee already exists for this user
-            Optional<Employee> existingEmployee = employeeRepository.findByUser(user);
+            // Check if employee already exists for this user by email
+            Optional<Employee> existingEmployee = employeeRepository.findByEmail(user.getEmail());
             if (existingEmployee.isPresent()) {
                 return; // Employee already exists, don't create duplicate
             }
             
+            // Generate unique employee ID
+            String employeeId = generateEmployeeId(user);
+            
             // Create new employee record
-            Employee employee = new Employee();
-            employee.setUser(user);
-            employee.setFullName(user.getFullName());
-            employee.setEmail(user.getEmail());
-            employee.setDepartment(user.getDepartment());
+            Employee employee = new Employee(
+                employeeId,
+                user.getFullName(),
+                user.getEmail(),
+                user.getDepartment(),
+                "Employee", // Default position
+                LocalDate.now(), // Join date
+                "" // Phone number (empty for now)
+            );
             
             // Set default values for new employees
-            employee.setLeaveBalance(20); // 20 days annual leave
-            employee.setJoinDate(LocalDate.now()); // Today's date
+            employee.setTotalLeaveEntitlement(25); // 25 days annual leave
+            employee.setUsedLeaves(0);
+            employee.setRemainingLeaves(25);
             employee.setActive(true); // Active by default
             
             // Save employee to database
             employeeRepository.save(employee);
             
-            System.out.println("Created employee record for user: " + user.getUsername());
+            System.out.println("Created employee record for user: " + user.getUsername() + " with ID: " + employeeId);
             
         } catch (Exception e) {
             System.err.println("Error creating employee record: " + e.getMessage());
             throw new RuntimeException("Failed to create employee record", e);
         }
+    }
+    
+    private String generateEmployeeId(User user) {
+        // Generate employee ID based on department and timestamp
+        String deptCode = user.getDepartment().substring(0, Math.min(3, user.getDepartment().length())).toUpperCase();
+        String timestamp = String.valueOf(System.currentTimeMillis() % 10000);
+        return deptCode + timestamp;
     }
 
     

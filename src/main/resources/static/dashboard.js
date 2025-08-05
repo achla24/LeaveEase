@@ -1,7 +1,7 @@
 // Dashboard JavaScript
 class LeaveDashboard {
     constructor() {
-        this.baseURL = 'http://localhost:9090';
+        this.baseURL = 'http://localhost:8080';
         this.chart = null;
         this.userRole = this.getUserRole(); // Get user role from URL or session
         this.init();
@@ -39,7 +39,62 @@ class LeaveDashboard {
             userRoleElement.textContent = this.userRole === 'hr' ? 'HR Manager' : 'Employee';
             userRoleElement.className = `user-role ${this.userRole}-role`;
         }
+        
+        // Load user profile for header
+        this.loadHeaderUserInfo();
     }
+    
+    async loadHeaderUserInfo() {
+        try {
+            console.log('🔄 Loading header user info...');
+            const response = await fetch('/api/user/profile');
+            if (response.ok) {
+                const userProfile = await response.json();
+                console.log('✅ Received user profile:', userProfile);
+                
+                // Update user name in header
+                const userNameElement = document.getElementById('userName');
+                if (userNameElement) {
+                    userNameElement.textContent = userProfile.fullName || 'User';
+                }
+                
+                // Update user avatar with profile picture or initials
+                const userAvatar = document.querySelector('.user-avatar');
+                if (userAvatar) {
+                    if (userProfile.profilePicture) {
+                        // Show profile picture
+                        console.log('🖼️ Setting profile picture:', userProfile.profilePicture);
+                        userAvatar.style.backgroundImage = `url(${userProfile.profilePicture})`;
+                        userAvatar.style.backgroundSize = 'cover';
+                        userAvatar.style.backgroundPosition = 'center';
+                        userAvatar.textContent = '';
+                    } else if (userProfile.fullName) {
+                        // Show initials
+                        console.log('🔤 Setting initials for:', userProfile.fullName);
+                        const initials = userProfile.fullName
+                            .split(' ')
+                            .map(name => name.charAt(0))
+                            .join('')
+                            .toUpperCase()
+                            .substring(0, 2);
+                        userAvatar.textContent = initials;
+                        userAvatar.style.backgroundImage = '';
+                    }
+                }
+            } else {
+                console.error('❌ Failed to load user profile:', response.status);
+            }
+        } catch (error) {
+            console.error('Error loading header user info:', error);
+            // Set default values
+            const userAvatar = document.querySelector('.user-avatar');
+            if (userAvatar) {
+                userAvatar.textContent = 'U';
+            }
+        }
+    }
+    
+
     
     showHRFeatures() {
         // Add HR-specific stats cards
@@ -160,6 +215,24 @@ class LeaveDashboard {
         const leaveForm = document.getElementById('leaveForm');
         if (leaveForm) {
             leaveForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
+            // Auto-populate employee name when form is loaded
+            this.populateEmployeeName();
+        }
+    }
+    
+    async populateEmployeeName() {
+        try {
+            const response = await fetch('/api/user/profile');
+            if (response.ok) {
+                const userProfile = await response.json();
+                const employeeNameField = document.getElementById('employeeName');
+                if (employeeNameField && userProfile.fullName) {
+                    employeeNameField.value = userProfile.fullName;
+                    employeeNameField.readOnly = true; // Make it read-only since it's auto-populated
+                }
+            }
+        } catch (error) {
+            console.error('Error loading employee name:', error);
         }
     }
 
@@ -402,11 +475,39 @@ class LeaveDashboard {
 
     async loadHistoryData() {
         try {
-            const response = await fetch(`${this.baseURL}/leaves`);
+            console.log('📋 Loading leave history for current user...');
+            
+            // Use user-specific endpoint instead of all leaves
+            const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const leaves = await response.json();
+            console.log('✅ Loaded ' + leaves.length + ' leave requests for current user');
             
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
+            
+            if (leaves.length === 0) {
+                // Show message when no leaves found
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #64748b;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                            <span style="font-size: 24px;">📋</span>
+                            <span>No leave requests found</span>
+                            <span style="font-size: 14px;">Submit your first leave request using the "Request Leave" tab</span>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+                return;
+            }
+            
+            // Sort leaves by creation date (newest first)
+            leaves.sort((a, b) => new Date(b.createdAt || b.id) - new Date(a.createdAt || a.id));
             
             leaves.forEach(leave => {
                 const row = document.createElement('tr');
@@ -419,9 +520,14 @@ class LeaveDashboard {
                     <td><span class="status-badge status-${leave.status.toLowerCase()}">${leave.status}</span></td>
                     <td>
                         ${leave.status === 'Pending' ? `
-                            <button class="action-btn approve-btn" onclick="dashboard.updateLeaveStatus('${leave.id}', 'approve')">Approve</button>
-                            <button class="action-btn reject-btn" onclick="dashboard.updateLeaveStatus('${leave.id}', 'reject')">Reject</button>
-                        ` : ''}
+                            <button class="action-btn cancel-btn" onclick="dashboard.cancelLeaveRequest('${leave.id}')" title="Cancel Request">
+                                ❌ Cancel
+                            </button>
+                        ` : `
+                            <span style="color: #64748b; font-size: 14px;">
+                                ${leave.status === 'Approved' ? '✅ Approved' : '❌ ' + leave.status}
+                            </span>
+                        `}
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -429,6 +535,20 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error('Error loading history data:', error);
+            
+            // Show error message in table
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #ef4444;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                            <span style="font-size: 24px;">⚠️</span>
+                            <span>Error loading leave history</span>
+                            <span style="font-size: 14px;">${error.message}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
         }
     }
 
@@ -445,6 +565,24 @@ class LeaveDashboard {
             status: 'Pending'
         };
         
+        console.log('📝 Submitting leave request:', leaveData);
+        
+        // Validate dates
+        const startDate = new Date(leaveData.startDate);
+        const endDate = new Date(leaveData.endDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (startDate < today) {
+            alert('Start date cannot be in the past.');
+            return;
+        }
+        
+        if (endDate < startDate) {
+            alert('End date cannot be before start date.');
+            return;
+        }
+        
         try {
             const response = await fetch(`${this.baseURL}/leaves`, {
                 method: 'POST',
@@ -454,18 +592,79 @@ class LeaveDashboard {
                 body: JSON.stringify(leaveData)
             });
             
+            console.log('📤 Response status:', response.status);
+            
             if (response.ok) {
-                alert('Leave request submitted successfully!');
+                const result = await response.json();
+                console.log('✅ Leave request submitted:', result);
+                
+                // Show success notification
+                this.showNotification('Leave request submitted successfully!', 'success');
+                
+                // Reset form
                 e.target.reset();
-                this.loadDashboardData(); // Refresh dashboard data
+                
+                // Re-populate employee name
+                this.populateEmployeeName();
+                
+                // Refresh dashboard data
+                this.loadDashboardData();
             } else {
-                throw new Error('Failed to submit leave request');
+                const errorText = await response.text();
+                console.error('❌ Server error:', response.status, errorText);
+                throw new Error(`Server error: ${response.status} - ${errorText}`);
             }
             
         } catch (error) {
             console.error('Error submitting leave request:', error);
-            alert('Error submitting leave request. Please try again.');
+            this.showNotification('Error submitting leave request: ' + error.message, 'error');
         }
+    }
+    
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        
+        // Style the notification
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 10000;
+            animation: slideInRight 0.3s ease-out;
+            max-width: 300px;
+        `;
+        
+        // Set background color based on type
+        switch (type) {
+            case 'success':
+                notification.style.background = '#10b981';
+                break;
+            case 'error':
+                notification.style.background = '#ef4444';
+                break;
+            default:
+                notification.style.background = '#3b82f6';
+        }
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Remove after 4 seconds
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    document.body.removeChild(notification);
+                }
+            }, 300);
+        }, 4000);
     }
 
     async updateLeaveStatus(leaveId, action) {
@@ -475,7 +674,7 @@ class LeaveDashboard {
             });
             
             if (response.ok) {
-                alert(`Leave request ${action}d successfully!`);
+                this.showNotification(`Leave request ${action}d successfully!`, 'success');
                 this.loadHistoryData();
                 this.loadDashboardData();
             } else {
@@ -484,7 +683,34 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error(`Error ${action}ing leave request:`, error);
-            alert(`Error ${action}ing leave request. Please try again.`);
+            this.showNotification(`Error ${action}ing leave request. Please try again.`, 'error');
+        }
+    }
+    
+    async cancelLeaveRequest(leaveId) {
+        if (!confirm('Are you sure you want to cancel this leave request?')) {
+            return;
+        }
+        
+        try {
+            console.log('🗑️ Cancelling leave request:', leaveId);
+            
+            const response = await fetch(`${this.baseURL}/leaves/${leaveId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                console.log('✅ Leave request cancelled successfully');
+                this.showNotification('Leave request cancelled successfully!', 'success');
+                this.loadHistoryData(); // Refresh the history table
+                this.loadDashboardData(); // Refresh dashboard stats
+            } else {
+                throw new Error(`Failed to cancel leave request: ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.error('Error cancelling leave request:', error);
+            this.showNotification('Error cancelling leave request. Please try again.', 'error');
         }
     }
 
@@ -649,3 +875,223 @@ function logout() {
         window.location.href = '/logout';
     }
 }
+
+// Profile Modal Functions
+function showProfile() {
+    const modal = document.getElementById('profileModal');
+    modal.style.display = 'block';
+    loadUserProfile();
+}
+
+function closeProfileModal() {
+    const modal = document.getElementById('profileModal');
+    modal.style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('profileModal');
+    if (event.target === modal) {
+        closeProfileModal();
+    }
+}
+
+async function loadUserProfile() {
+    try {
+        // Get current user info from session/authentication
+        const response = await fetch('/api/user/profile');
+        
+        if (response.ok) {
+            const userProfile = await response.json();
+            
+            // Update modal with user data
+            document.getElementById('modalFullName').textContent = userProfile.fullName || 'Not provided';
+            document.getElementById('modalEmail').textContent = userProfile.email || 'Not provided';
+            document.getElementById('modalUsername').textContent = userProfile.username || 'Not provided';
+            document.getElementById('modalDepartment').textContent = userProfile.department || 'Not provided';
+            document.getElementById('modalRole').textContent = userProfile.role || 'Employee';
+            document.getElementById('modalEmployeeCode').textContent = userProfile.employeeCode || 'Not assigned';
+            
+            // Update profile picture if available
+            const modalProfilePicture = document.getElementById('modalProfilePicture');
+            if (userProfile.profilePicture) {
+                modalProfilePicture.src = userProfile.profilePicture;
+            } else {
+                // Use default avatar image
+                modalProfilePicture.src = '/images/default-avatar.svg';
+            }
+            
+        } else {
+            // Show error message if API not available
+            document.getElementById('modalFullName').textContent = 'Error loading profile';
+            document.getElementById('modalEmail').textContent = 'Please try again later';
+            document.getElementById('modalUsername').textContent = 'N/A';
+            document.getElementById('modalDepartment').textContent = 'N/A';
+            document.getElementById('modalRole').textContent = 'N/A';
+            document.getElementById('modalEmployeeCode').textContent = 'N/A';
+        }
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+        // Show error message
+        document.getElementById('modalFullName').textContent = 'Error loading profile';
+        document.getElementById('modalEmail').textContent = 'Please try again later';
+        document.getElementById('modalUsername').textContent = 'N/A';
+        document.getElementById('modalDepartment').textContent = 'N/A';
+        document.getElementById('modalRole').textContent = 'N/A';
+        document.getElementById('modalEmployeeCode').textContent = 'N/A';
+    }
+}
+
+function handleProfilePictureChange(event) {
+    const file = event.target.files[0];
+    if (file) {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please select a valid image file.');
+            return;
+        }
+        
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB.');
+            return;
+        }
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('modalProfilePicture').src = e.target.result;
+            // Also update the header avatar if needed
+            const headerAvatar = document.querySelector('.user-avatar');
+            if (headerAvatar) {
+                headerAvatar.style.backgroundImage = `url(${e.target.result})`;
+                headerAvatar.style.backgroundSize = 'cover';
+                headerAvatar.style.backgroundPosition = 'center';
+            }
+        };
+        reader.readAsDataURL(file);
+        
+        // Here you would typically upload the file to the server
+        uploadProfilePicture(file);
+    }
+}
+
+async function uploadProfilePicture(file) {
+    try {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        
+        const response = await fetch('/api/user/profile-picture', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Profile picture uploaded successfully:', result);
+            
+            // Show success message
+            if (window.dashboard) {
+                window.dashboard.showNotification('Profile picture updated successfully!', 'success');
+            }
+            
+            // Update header avatar with the server response path
+            const headerAvatar = document.querySelector('.user-avatar');
+            if (headerAvatar && result.profilePicture) {
+                headerAvatar.style.backgroundImage = `url(${result.profilePicture})`;
+                headerAvatar.style.backgroundSize = 'cover';
+                headerAvatar.style.backgroundPosition = 'center';
+                headerAvatar.textContent = '';
+                console.log('✅ Updated header avatar with:', result.profilePicture);
+            }
+        } else {
+            console.error('Failed to upload profile picture');
+            if (window.dashboard) {
+                window.dashboard.showNotification('Failed to update profile picture. Please try again.', 'error');
+            }
+        }
+    } catch (error) {
+        console.error('Error uploading profile picture:', error);
+        if (window.dashboard) {
+            window.dashboard.showNotification('Error uploading profile picture. Please try again.', 'error');
+        }
+    }
+}
+
+function saveProfileChanges() {
+    // For now, just show a success message
+    if (window.dashboard) {
+        window.dashboard.showNotification('Profile changes saved successfully!', 'success');
+    }
+    closeProfileModal();
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    // Style the notification
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    // Set background color based on type
+    switch (type) {
+        case 'success':
+            notification.style.background = '#10b981';
+            break;
+        case 'error':
+            notification.style.background = '#ef4444';
+            break;
+        default:
+            notification.style.background = '#3b82f6';
+    }
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+// Add CSS for notification animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);

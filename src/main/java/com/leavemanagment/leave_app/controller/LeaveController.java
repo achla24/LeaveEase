@@ -2,9 +2,11 @@ package com.leavemanagment.leave_app.controller;
 
 import com.leavemanagment.leave_app.model.LeaveRequest;
 import com.leavemanagment.leave_app.repository.LeaveRequestRepository;
+import com.leavemanagment.leave_app.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -18,6 +20,9 @@ public class LeaveController {
 
     @Autowired
     private LeaveRequestRepository leaveRequestRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
 
     // CREATE: Add a new leave request with validation
     @PostMapping
@@ -28,11 +33,45 @@ public class LeaveController {
         return ResponseEntity.created(location).body(savedLeave);
     }
 
-    // READ ALL: Get all leave requests
+    // READ ALL: Get all leave requests (for admin/HR)
     @GetMapping
     public List<LeaveRequest> getAllLeaves() {
         System.out.println("Fetching all leave requests...");
         return leaveRequestRepository.findAll();
+    }
+    
+    // READ USER LEAVES: Get leave requests for current user only
+    @GetMapping("/my-leaves")
+    public ResponseEntity<List<LeaveRequest>> getMyLeaves(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                System.err.println("❌ No authentication for my-leaves request");
+                return ResponseEntity.status(401).build();
+            }
+            
+            String username = authentication.getName();
+            System.out.println("🔍 Fetching leaves for user: " + username);
+            
+            // Get user's full name from UserRepository
+            Optional<com.leavemanagment.leave_app.model.User> userOpt = userRepository.findByUsername(username);
+            if (!userOpt.isPresent()) {
+                System.err.println("❌ User not found: " + username);
+                return ResponseEntity.notFound().build();
+            }
+            
+            String fullName = userOpt.get().getFullName();
+            System.out.println("👤 Looking for leaves by employee name: " + fullName);
+            
+            // Find leaves by employee name
+            List<LeaveRequest> userLeaves = leaveRequestRepository.findByEmployeeName(fullName);
+            System.out.println("📋 Found " + userLeaves.size() + " leaves for " + fullName);
+            
+            return ResponseEntity.ok(userLeaves);
+            
+        } catch (Exception e) {
+            System.err.println("Error fetching user leaves: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     // READ ONE: Get a leave request by ID

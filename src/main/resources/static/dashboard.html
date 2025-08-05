@@ -15,7 +15,7 @@
         <header class="dashboard-header">
             <h1>Employee Leave Management</h1>
             <div class="header-actions">
-                <div class="user-profile">
+                <div class="user-profile" onclick="showProfile()" style="cursor: pointer;" title="Click to view profile">
                     <div class="user-avatar"></div>
                     <div class="user-info">
                         <span class="user-name" id="userName">User</span>
@@ -229,6 +229,71 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👤 My Profile</h2>
+                <span class="close" onclick="closeProfileModal()">&times;</span>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Profile Picture Section -->
+                <div class="profile-picture-section">
+                    <div class="profile-picture-container">
+                        <img id="modalProfilePicture" src="/images/default-avatar.svg" alt="Profile Picture" class="profile-picture">
+                        <div class="profile-picture-overlay" onclick="document.getElementById('profilePictureInput').click()">
+                            <span class="camera-icon">📷</span>
+                            <span class="change-text">Change Photo</span>
+                        </div>
+                    </div>
+                    <input type="file" id="profilePictureInput" accept="image/*" style="display: none;" onchange="handleProfilePictureChange(event)">
+                    <button class="change-picture-btn" onclick="document.getElementById('profilePictureInput').click()">
+                        📷 Change Picture
+                    </button>
+                </div>
+
+                <!-- Profile Information -->
+                <div class="profile-info-section">
+                    <div class="info-group">
+                        <label>👤 Full Name</label>
+                        <div class="info-value" id="modalFullName">Loading...</div>
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>📧 Email</label>
+                        <div class="info-value" id="modalEmail">Loading...</div>
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>🆔 Username</label>
+                        <div class="info-value" id="modalUsername">Loading...</div>
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>🏢 Department</label>
+                        <div class="info-value" id="modalDepartment">Loading...</div>
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>🎯 Role</label>
+                        <div class="info-value" id="modalRole">Loading...</div>
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>🔢 Employee Code</label>
+                        <div class="info-value" id="modalEmployeeCode">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="closeProfileModal()">Close</button>
+                <button class="modal-btn primary" onclick="saveProfileChanges()">Save Changes</button>
+            </div>
+        </div>
     </div>
 
     <script src="dashboard.js"></script>

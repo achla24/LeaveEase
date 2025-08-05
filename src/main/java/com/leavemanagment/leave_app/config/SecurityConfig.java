@@ -40,7 +40,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/", "/login", "/login.html", "/signup", "/signup.html", "/register", "/css/**", "/js/**", "/images/**", 
-                               "/static/**", "/index.html", "/style.css", "/script.js", "/test.html", "/create-users", "/test-user", "/debug-login").permitAll()
+                               "/static/**", "/uploads/**", "/index.html", "/style.css", "/script.js", "/test.html", "/create-users", "/test-user", "/debug-login").permitAll()
                 .requestMatchers("/api/dashboard/hr/**").hasAnyRole("HR", "ADMIN")
                 .requestMatchers("/dashboard.html").authenticated()
                 .requestMatchers("/hr-dashboard.html").hasAnyRole("HR", "ADMIN")
