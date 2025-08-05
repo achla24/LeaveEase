@@ -4,6 +4,11 @@ class LeaveDashboard {
         this.baseURL = 'http://localhost:8080';
         this.chart = null;
         this.userRole = this.getUserRole(); // Get user role from URL or session
+        this.currentDate = new Date();
+        this.calendarData = {
+            leaveDays: [],
+            lateDays: []
+        };
         this.init();
     }
 
@@ -218,6 +223,18 @@ class LeaveDashboard {
             // Auto-populate employee name when form is loaded
             this.populateEmployeeName();
         }
+        
+        // Calendar navigation
+        const prevMonthBtn = document.getElementById('prevMonth');
+        const nextMonthBtn = document.getElementById('nextMonth');
+        
+        if (prevMonthBtn) {
+            prevMonthBtn.addEventListener('click', () => this.navigateMonth(-1));
+        }
+        
+        if (nextMonthBtn) {
+            nextMonthBtn.addEventListener('click', () => this.navigateMonth(1));
+        }
     }
     
     async populateEmployeeName() {
@@ -255,6 +272,8 @@ class LeaveDashboard {
                 // Load specific data for the tab
                 if (targetTab === 'history') {
                     this.loadHistoryData();
+                } else if (targetTab === 'calendar') {
+                    this.loadCalendarData();
                 } else if (targetTab === 'hr-management' && this.userRole === 'hr') {
                     this.loadHRData();
                 }
@@ -346,22 +365,47 @@ class LeaveDashboard {
 
     async loadQuarterlyData() {
         try {
-            // this line will ask java backend for the data of q1,q2,q3,q4
+            console.log('📊 Loading quarterly leave data for current user...');
+            
             const response = await fetch(`${this.baseURL}/api/dashboard/quarterly-data`);
-        //  this will call the data
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('✅ Received quarterly data:', data);
             
             this.createChart(data);
             
-            // Update chart summary
-            const totalTaken = Object.values(data.taken).reduce((sum, val) => sum + val, 0);
-            const totalRemaining = Object.values(data.remaining).reduce((sum, val) => sum + val, 0);
+            // Update chart summary with real user data
+            const totalTaken = data.totalTakenThisYear || 0;
+            const totalRemaining = data.totalRemainingThisYear || 0;
+            const annualAllowance = data.annualAllowance || 25;
             
             document.getElementById('chartTotalDays').textContent = totalTaken;
             document.getElementById('chartRemainingDays').textContent = totalRemaining;
             
+            // Update the chart subtitle with real data
+            const chartSubtitle = document.querySelector('.chart-subtitle');
+            if (chartSubtitle) {
+                chartSubtitle.textContent = `${totalTaken} days used of ${annualAllowance} annual allowance`;
+            }
+            
+            console.log(`📈 Chart updated: ${totalTaken} taken, ${totalRemaining} remaining out of ${annualAllowance} total`);
+            
         } catch (error) {
-            console.error('Error loading quarterly data:', error);
+            console.error('❌ Error loading quarterly data:', error);
+            
+            // Show error state in chart
+            document.getElementById('chartTotalDays').textContent = '--';
+            document.getElementById('chartRemainingDays').textContent = '--';
+            
+            const chartSubtitle = document.querySelector('.chart-subtitle');
+            if (chartSubtitle) {
+                chartSubtitle.textContent = 'Error loading leave data';
+                chartSubtitle.style.color = '#ef4444';
+            }
         }
     }
 
@@ -372,24 +416,42 @@ class LeaveDashboard {
             this.chart.destroy();
         }
         
+        // Get current year for better labels
+        const currentYear = new Date().getFullYear();
+        
         this.chart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                labels: [
+                    `Q1 ${currentYear}`,
+                    `Q2 ${currentYear}`,
+                    `Q3 ${currentYear}`,
+                    `Q4 ${currentYear}`
+                ],
                 datasets: [
                     {
-                        label: 'Leave days taken',
-                        data: [data.taken.Q1, data.taken.Q2, data.taken.Q3, data.taken.Q4],
+                        label: 'Days Taken',
+                        data: [
+                            data.taken.Q1 || 0,
+                            data.taken.Q2 || 0,
+                            data.taken.Q3 || 0,
+                            data.taken.Q4 || 0
+                        ],
                         backgroundColor: '#4F46E5',
-                        borderRadius: 4,
-                        barThickness: 40
+                        borderRadius: 6,
+                        barThickness: 35
                     },
                     {
-                        label: 'Remaining',
-                        data: [data.remaining.Q1, data.remaining.Q2, data.remaining.Q3, data.remaining.Q4],
+                        label: 'Available',
+                        data: [
+                            data.remaining.Q1 || 0,
+                            data.remaining.Q2 || 0,
+                            data.remaining.Q3 || 0,
+                            data.remaining.Q4 || 0
+                        ],
                         backgroundColor: '#E5E7EB',
-                        borderRadius: 4,
-                        barThickness: 40
+                        borderRadius: 6,
+                        barThickness: 35
                     }
                 ]
             },
@@ -498,14 +560,28 @@ class LeaveDashboard {
 
     async loadTeamOnLeave() {
         try {
+            console.log('👥 Loading team members on leave TODAY...');
+            
             const response = await fetch(`${this.baseURL}/api/dashboard/team-on-leave`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const teamMembers = await response.json();
+            console.log('✅ Found ' + teamMembers.length + ' team members on leave today');
             
             const container = document.getElementById('teamOnLeaveList');
             container.innerHTML = '';
             
             if (teamMembers.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No team members currently on leave</p>';
+                container.innerHTML = `
+                    <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">👥</div>
+                        <div>All team members are present today</div>
+                        <div style="font-size: 14px; margin-top: 5px;">No one is on leave today</div>
+                    </div>
+                `;
                 return;
             }
             
@@ -513,13 +589,37 @@ class LeaveDashboard {
                 const memberItem = document.createElement('div');
                 memberItem.className = 'team-member';
                 
+                // Calculate how many days into their leave they are
+                const startDate = new Date(member.startDate);
+                const endDate = new Date(member.endDate);
+                const today = new Date();
+                
+                const totalLeaveDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                const daysIntoLeave = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                const daysRemaining = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+                
+                let statusText = '';
+                if (daysRemaining === 0) {
+                    statusText = 'Last day of leave';
+                } else if (daysRemaining === 1) {
+                    statusText = 'Returns tomorrow';
+                } else {
+                    statusText = `Returns in ${daysRemaining} days`;
+                }
+                
                 memberItem.innerHTML = `
-                    <div class="member-avatar"></div>
-                    <div class="member-info">
-                        <div class="member-name">${member.employeeName}</div>
-                        <div class="member-dates">${this.formatDate(member.startDate)} - ${this.formatDate(member.endDate)}</div>
+                    <div class="member-avatar" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
+                        ${member.employeeName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                     </div>
-                    <span class="member-type">${member.leaveType}</span>
+                    <div class="member-info" style="flex: 1;">
+                        <div class="member-name" style="font-weight: 600; color: #1f2937; margin-bottom: 2px;">${member.employeeName}</div>
+                        <div class="member-type" style="color: #6b7280; font-size: 13px; margin-bottom: 2px;">${member.leaveType} Leave</div>
+                        <div class="member-status" style="color: #3b82f6; font-size: 12px; font-weight: 500;">${statusText}</div>
+                    </div>
+                    <div class="member-duration" style="text-align: right; color: #6b7280; font-size: 12px;">
+                        <div>Day ${daysIntoLeave}/${totalLeaveDays}</div>
+                        <div style="margin-top: 2px; color: #ef4444; font-weight: 500;">🔴 On Leave</div>
+                    </div>
                 `;
                 
                 container.appendChild(memberItem);
@@ -527,6 +627,14 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error('Error loading team on leave:', error);
+            const container = document.getElementById('teamOnLeaveList');
+            container.innerHTML = `
+                <div class="error" style="text-align: center; padding: 20px; color: #ef4444;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                    <div>Error loading team data</div>
+                    <div style="font-size: 14px; margin-top: 5px;">${error.message}</div>
+                </div>
+            `;
         }
     }
 
@@ -1016,6 +1124,274 @@ class LeaveDashboard {
         } catch (error) {
             console.error('Error loading department stats:', error);
         }
+    }
+    
+    // ========== CALENDAR METHODS ==========
+    
+    async loadCalendarData() {
+        try {
+            console.log('📅 Loading calendar data...');
+            
+            // Load user's leave data
+            await this.loadUserLeaveData();
+            
+            // Load user's attendance data (late days) - for now we'll simulate this
+            await this.loadUserAttendanceData();
+            
+            // Render the calendar
+            this.renderCalendar();
+            
+            // Update calendar summary
+            this.updateCalendarSummary();
+            
+        } catch (error) {
+            console.error('Error loading calendar data:', error);
+        }
+    }
+    
+    async loadUserLeaveData() {
+        try {
+            const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const leaves = await response.json();
+            
+            // Extract all leave days from approved requests
+            this.calendarData.leaveDays = [];
+            
+            leaves.forEach(leave => {
+                if (leave.status === 'Approved' && leave.startDate && leave.endDate) {
+                    const startDate = new Date(leave.startDate);
+                    const endDate = new Date(leave.endDate);
+                    
+                    // Add all days between start and end date
+                    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+                        this.calendarData.leaveDays.push({
+                            date: new Date(date),
+                            type: leave.leaveType,
+                            reason: leave.reason
+                        });
+                    }
+                }
+            });
+            
+            console.log('✅ Loaded leave days:', this.calendarData.leaveDays.length);
+            
+        } catch (error) {
+            console.error('Error loading leave data:', error);
+            this.calendarData.leaveDays = [];
+        }
+    }
+    
+    async loadUserAttendanceData() {
+        try {
+            // For now, simulate some late days
+            // In a real application, this would come from an attendance API
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            
+            this.calendarData.lateDays = [
+                { date: new Date(currentYear, currentMonth, 5), reason: 'Traffic jam' },
+                { date: new Date(currentYear, currentMonth, 12), reason: 'Overslept' },
+                { date: new Date(currentYear, currentMonth, 18), reason: 'Medical appointment' }
+            ];
+            
+            console.log('✅ Loaded late days:', this.calendarData.lateDays.length);
+            
+        } catch (error) {
+            console.error('Error loading attendance data:', error);
+            this.calendarData.lateDays = [];
+        }
+    }
+    
+    renderCalendar() {
+        const year = this.currentDate.getFullYear();
+        const month = this.currentDate.getMonth();
+        
+        // Update month/year display
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        
+        document.getElementById('currentMonth').textContent = monthNames[month];
+        document.getElementById('currentYear').textContent = year;
+        
+        // Get first day of month and number of days
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDayOfWeek = firstDay.getDay();
+        
+        // Get previous month's last days
+        const prevMonth = new Date(year, month, 0);
+        const daysInPrevMonth = prevMonth.getDate();
+        
+        const calendarDays = document.getElementById('calendarDays');
+        calendarDays.innerHTML = '';
+        
+        // Add previous month's trailing days
+        for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+            const dayNum = daysInPrevMonth - i;
+            const dayElement = this.createCalendarDay(dayNum, true, new Date(year, month - 1, dayNum));
+            calendarDays.appendChild(dayElement);
+        }
+        
+        // Add current month's days
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDay = new Date(year, month, day);
+            const dayElement = this.createCalendarDay(day, false, currentDay);
+            calendarDays.appendChild(dayElement);
+        }
+        
+        // Add next month's leading days
+        const totalCells = calendarDays.children.length;
+        const remainingCells = 42 - totalCells; // 6 rows × 7 days = 42 cells
+        
+        for (let day = 1; day <= remainingCells; day++) {
+            const dayElement = this.createCalendarDay(day, true, new Date(year, month + 1, day));
+            calendarDays.appendChild(dayElement);
+        }
+    }
+    
+    createCalendarDay(dayNum, isOtherMonth, date) {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+        
+        if (isOtherMonth) {
+            dayElement.classList.add('other-month');
+        }
+        
+        // Check if it's today
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+            dayElement.classList.add('today');
+        }
+        
+        // Check if it's weekend
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            dayElement.classList.add('weekend');
+        }
+        
+        // Check if it's a leave day
+        const isLeaveDay = this.calendarData.leaveDays.some(leave => 
+            leave.date.toDateString() === date.toDateString()
+        );
+        
+        // Check if it's a late day
+        const isLateDay = this.calendarData.lateDays.some(late => 
+            late.date.toDateString() === date.toDateString()
+        );
+        
+        if (isLeaveDay) {
+            dayElement.classList.add('leave-day');
+        }
+        
+        if (isLateDay) {
+            dayElement.classList.add('late-day');
+        }
+        
+        // Create day content
+        const dayNumber = document.createElement('div');
+        dayNumber.className = 'day-number';
+        dayNumber.textContent = dayNum;
+        dayElement.appendChild(dayNumber);
+        
+        // Add indicators
+        const indicators = document.createElement('div');
+        indicators.className = 'day-indicators';
+        
+        if (isLeaveDay) {
+            const leaveIndicator = document.createElement('div');
+            leaveIndicator.className = 'day-indicator indicator-leave';
+            leaveIndicator.title = 'Leave Day';
+            indicators.appendChild(leaveIndicator);
+        }
+        
+        if (isLateDay) {
+            const lateIndicator = document.createElement('div');
+            lateIndicator.className = 'day-indicator indicator-late';
+            lateIndicator.title = 'Late Day';
+            indicators.appendChild(lateIndicator);
+        }
+        
+        dayElement.appendChild(indicators);
+        
+        // Add click event for day details
+        dayElement.addEventListener('click', () => {
+            this.showDayDetails(date, isLeaveDay, isLateDay);
+        });
+        
+        return dayElement;
+    }
+    
+    showDayDetails(date, isLeaveDay, isLateDay) {
+        if (!isLeaveDay && !isLateDay) return;
+        
+        let details = `📅 ${date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        })}\n\n`;
+        
+        if (isLeaveDay) {
+            const leaveInfo = this.calendarData.leaveDays.find(leave => 
+                leave.date.toDateString() === date.toDateString()
+            );
+            details += `🏖️ Leave Day\nType: ${leaveInfo.type}\nReason: ${leaveInfo.reason}\n\n`;
+        }
+        
+        if (isLateDay) {
+            const lateInfo = this.calendarData.lateDays.find(late => 
+                late.date.toDateString() === date.toDateString()
+            );
+            details += `⏰ Late Day\nReason: ${lateInfo.reason}`;
+        }
+        
+        alert(details);
+    }
+    
+    navigateMonth(direction) {
+        this.currentDate.setMonth(this.currentDate.getMonth() + direction);
+        this.renderCalendar();
+        this.updateCalendarSummary();
+    }
+    
+    updateCalendarSummary() {
+        const year = this.currentDate.getFullYear();
+        const month = this.currentDate.getMonth();
+        
+        // Count leave days in current month
+        const monthLeaveDays = this.calendarData.leaveDays.filter(leave => 
+            leave.date.getFullYear() === year && leave.date.getMonth() === month
+        ).length;
+        
+        // Count late days in current month
+        const monthLateDays = this.calendarData.lateDays.filter(late => 
+            late.date.getFullYear() === year && late.date.getMonth() === month
+        ).length;
+        
+        // Calculate working days (excluding weekends)
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let workingDays = 0;
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const dayOfWeek = date.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+                workingDays++;
+            }
+        }
+        
+        // Update summary display
+        document.getElementById('monthLeaveDays').textContent = monthLeaveDays;
+        document.getElementById('monthLateDays').textContent = monthLateDays;
+        document.getElementById('monthWorkingDays').textContent = workingDays;
     }
 }
 

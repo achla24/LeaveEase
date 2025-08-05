@@ -96,29 +96,29 @@
                 <div class="content-grid">
                     <!-- Leave Overview Chart -->
                     <div class="chart-section">
-                        <h3>Leave Overview</h3>
-                        <p class="chart-subtitle">29 days breakdown for the current year</p>
+                        <h3>My Leave Overview</h3>
+                        <p class="chart-subtitle">Loading your leave data...</p>
                         <div class="chart-container">
                             <canvas id="leaveChart"></canvas>
                         </div>
                         <div class="chart-legend">
                             <div class="legend-item">
                                 <span class="legend-color" style="background-color: #4F46E5;"></span>
-                                <span>Leave days taken</span>
+                                <span>Days Taken</span>
                             </div>
                             <div class="legend-item">
                                 <span class="legend-color" style="background-color: #E5E7EB;"></span>
-                                <span>Remaining</span>
+                                <span>Available</span>
                             </div>
                         </div>
                         <div class="chart-summary">
                             <div class="summary-item">
-                                <span class="summary-label">Total days</span>
-                                <span class="summary-value" id="chartTotalDays">20</span>
+                                <span class="summary-label">Used This Year</span>
+                                <span class="summary-value" id="chartTotalDays">--</span>
                             </div>
                             <div class="summary-item">
                                 <span class="summary-label">Remaining</span>
-                                <span class="summary-value" id="chartRemainingDays">29</span>
+                                <span class="summary-value" id="chartRemainingDays">--</span>
                             </div>
                         </div>
                     </div>
@@ -146,8 +146,8 @@
 
                     <!-- Team Members on Leave -->
                     <div class="team-section">
-                        <h3>Team Member on Leave</h3>
-                        <p class="section-subtitle">Colleagues currently or soon to be on leave</p>
+                        <h3>Team Members on Leave Today</h3>
+                        <p class="section-subtitle">Colleagues who are absent today</p>
                         <div id="teamOnLeaveList" class="team-list">
                             <!-- Dynamic content will be loaded here -->
                         </div>
@@ -199,8 +199,81 @@
             <!-- Calendar Tab -->
             <div id="calendar" class="tab-content">
                 <div class="calendar-container">
-                    <h2>Leave Calendar</h2>
-                    <p>Calendar view coming soon...</p>
+                    <div class="calendar-header">
+                        <h2>📅 My Calendar</h2>
+                        <p class="calendar-subtitle">View your leave days and attendance status</p>
+                    </div>
+                    
+                    <!-- Calendar Controls -->
+                    <div class="calendar-controls">
+                        <button class="calendar-nav-btn" id="prevMonth">
+                            <span>◀</span>
+                        </button>
+                        <div class="calendar-month-year">
+                            <span id="currentMonth">January</span>
+                            <span id="currentYear">2024</span>
+                        </div>
+                        <button class="calendar-nav-btn" id="nextMonth">
+                            <span>▶</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Calendar Legend -->
+                    <div class="calendar-legend">
+                        <div class="legend-item">
+                            <span class="legend-color leave-day"></span>
+                            <span>Leave Day</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color late-day"></span>
+                            <span>Late Day</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color today"></span>
+                            <span>Today</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color weekend"></span>
+                            <span>Weekend</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Calendar Grid -->
+                    <div class="calendar-grid">
+                        <div class="calendar-weekdays">
+                            <div class="weekday">Sun</div>
+                            <div class="weekday">Mon</div>
+                            <div class="weekday">Tue</div>
+                            <div class="weekday">Wed</div>
+                            <div class="weekday">Thu</div>
+                            <div class="weekday">Fri</div>
+                            <div class="weekday">Sat</div>
+                        </div>
+                        <div class="calendar-days" id="calendarDays">
+                            <!-- Calendar days will be generated by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Calendar Summary -->
+                    <div class="calendar-summary">
+                        <div class="summary-card">
+                            <div class="summary-title">This Month</div>
+                            <div class="summary-stats">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="monthLeaveDays">0</span>
+                                    <span class="stat-label">Leave Days</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="monthLateDays">0</span>
+                                    <span class="stat-label">Late Days</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="monthWorkingDays">22</span>
+                                    <span class="stat-label">Working Days</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

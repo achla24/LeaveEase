@@ -155,38 +155,77 @@ public class DashboardController {
     }
 
     @GetMapping("/quarterly-data")
-    public Map<String, Object> getQuarterlyData() {
-        Map<String, Object> data = new HashMap<>();
-        
-        LocalDate currentDate = LocalDate.now();
-        int currentYear = currentDate.getYear();
-        
-        List<LeaveRequest> allRequests = leaveRequestRepository.findAll();
-        
-        // Calculate quarterly data
-        Map<String, Long> quarterlyTaken = new HashMap<>();
-        Map<String, Long> quarterlyRemaining = new HashMap<>();
-        
-        for (int quarter = 1; quarter <= 4; quarter++) {
-            LocalDate quarterStart = getQuarterStart(currentYear, quarter);
-            LocalDate quarterEnd = getQuarterEnd(currentYear, quarter);
+    public ResponseEntity<Map<String, Object>> getQuarterlyData(Authentication authentication) {
+        try {
+            if (authentication == null) {
+                System.err.println("❌ No authentication for quarterly-data request");
+                return ResponseEntity.status(401).build();
+            }
             
-            long takenDays = allRequests.stream()
+            String currentUsername = authentication.getName();
+            System.out.println("📊 Loading quarterly data for user: " + currentUsername);
+            
+            Map<String, Object> data = new HashMap<>();
+            
+            LocalDate currentDate = LocalDate.now();
+            int currentYear = currentDate.getYear();
+            
+            // Get only the current user's leave requests
+            List<LeaveRequest> userRequests = leaveRequestRepository.findByEmployeeName(currentUsername);
+            System.out.println("📋 Found " + userRequests.size() + " leave requests for " + currentUsername);
+            
+            // Calculate quarterly data for current user only
+            Map<String, Long> quarterlyTaken = new HashMap<>();
+            Map<String, Long> quarterlyRemaining = new HashMap<>();
+            
+            // Calculate total annual leave allowance (you can make this configurable)
+            final long ANNUAL_LEAVE_ALLOWANCE = 25; // 25 days per year
+            final long QUARTERLY_ALLOWANCE = ANNUAL_LEAVE_ALLOWANCE / 4; // ~6 days per quarter
+            
+            for (int quarter = 1; quarter <= 4; quarter++) {
+                LocalDate quarterStart = getQuarterStart(currentYear, quarter);
+                LocalDate quarterEnd = getQuarterEnd(currentYear, quarter);
+                
+                long takenDays = userRequests.stream()
+                    .filter(request -> "Approved".equals(request.getStatus()))
+                    .filter(request -> request.getStartDate() != null && 
+                            !request.getStartDate().isBefore(quarterStart) && 
+                            !request.getStartDate().isAfter(quarterEnd))
+                    .mapToLong(LeaveRequest::getLeaveDuration)
+                    .sum();
+                
+                quarterlyTaken.put("Q" + quarter, takenDays);
+                quarterlyRemaining.put("Q" + quarter, Math.max(0, QUARTERLY_ALLOWANCE - takenDays));
+                
+                System.out.println("Q" + quarter + " - Taken: " + takenDays + ", Remaining: " + (QUARTERLY_ALLOWANCE - takenDays));
+            }
+            
+            // Calculate year-to-date totals
+            long totalTakenThisYear = userRequests.stream()
                 .filter(request -> "Approved".equals(request.getStatus()))
                 .filter(request -> request.getStartDate() != null && 
-                        !request.getStartDate().isBefore(quarterStart) && 
-                        !request.getStartDate().isAfter(quarterEnd))
+                        request.getStartDate().getYear() == currentYear)
                 .mapToLong(LeaveRequest::getLeaveDuration)
                 .sum();
             
-            quarterlyTaken.put("Q" + quarter, takenDays);
-            quarterlyRemaining.put("Q" + quarter, Math.max(0, 29 - takenDays)); // Assuming 29 days per year
+            long totalRemainingThisYear = Math.max(0, ANNUAL_LEAVE_ALLOWANCE - totalTakenThisYear);
+            
+            data.put("taken", quarterlyTaken);
+            data.put("remaining", quarterlyRemaining);
+            data.put("totalTakenThisYear", totalTakenThisYear);
+            data.put("totalRemainingThisYear", totalRemainingThisYear);
+            data.put("annualAllowance", ANNUAL_LEAVE_ALLOWANCE);
+            
+            System.out.println("✅ Quarterly data calculated successfully for " + currentUsername);
+            System.out.println("📊 Total taken this year: " + totalTakenThisYear + "/" + ANNUAL_LEAVE_ALLOWANCE);
+            
+            return ResponseEntity.ok(data);
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error calculating quarterly data: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
-        
-        data.put("taken", quarterlyTaken);
-        data.put("remaining", quarterlyRemaining);
-        
-        return data;
     }
 
     @GetMapping("/upcoming-leaves")
