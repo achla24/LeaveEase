@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -27,8 +28,16 @@ public class LeaveController {
     // CREATE: Add a new leave request with validation
     @PostMapping
     public ResponseEntity<LeaveRequest> createLeave(@Valid @RequestBody LeaveRequest leaveRequest) {
+        System.out.println("📝 Creating new leave request for: " + leaveRequest.getEmployeeName());
+        System.out.println("📅 Start Date: " + leaveRequest.getStartDate());
+        System.out.println("📅 End Date: " + leaveRequest.getEndDate());
+        System.out.println("📋 Reason: " + leaveRequest.getReason());
+        System.out.println("🏷️ Leave Type: " + leaveRequest.getLeaveType());
+        
         LeaveRequest savedLeave = leaveRequestRepository.save(leaveRequest);
-        System.out.println("Received Leave Request: " + leaveRequest);
+        System.out.println("✅ Leave request saved with ID: " + savedLeave.getId());
+        System.out.println("📊 Total leave requests in database: " + leaveRequestRepository.count());
+        
         URI location = URI.create(String.format("/leaves/%s", savedLeave.getId()));
         return ResponseEntity.created(location).body(savedLeave);
     }
@@ -102,17 +111,70 @@ public class LeaveController {
         if (optional.isPresent()) {
             LeaveRequest leave = optional.get();
             leave.setStatus("Approved");
+            leave.setRejectionReason(null); // Clear any previous rejection reason
             return ResponseEntity.ok(leaveRequestRepository.save(leave));
         }
         return ResponseEntity.notFound().build();
     }
 
     @PutMapping("/{id}/reject")
-    public ResponseEntity<LeaveRequest> rejectLeave(@PathVariable String id) {
+    public ResponseEntity<LeaveRequest> rejectLeave(@PathVariable String id, @RequestBody(required = false) Map<String, String> requestBody) {
+        try {
+            System.out.println("❌ Rejecting leave request with ID: " + id);
+            System.out.println("📋 Request body: " + requestBody);
+            
+            Optional<LeaveRequest> optional = leaveRequestRepository.findById(id);
+            if (optional.isPresent()) {
+                LeaveRequest leave = optional.get();
+                System.out.println("📝 Found leave request for: " + leave.getEmployeeName());
+                
+                leave.setStatus("Rejected");
+                
+                // Get rejection reason from request body
+                String rejectionReason = null;
+                if (requestBody != null && requestBody.containsKey("rejectionReason")) {
+                    rejectionReason = requestBody.get("rejectionReason");
+                    System.out.println("📋 Rejection reason: " + rejectionReason);
+                }
+                leave.setRejectionReason(rejectionReason);
+                
+                LeaveRequest savedLeave = leaveRequestRepository.save(leave);
+                System.out.println("✅ Leave request rejected successfully");
+                
+                return ResponseEntity.ok(savedLeave);
+            } else {
+                System.err.println("❌ Leave request not found with ID: " + id);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error rejecting leave request: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // New endpoint for HR to approve/reject with detailed information
+    @PutMapping("/{id}/hr-action")
+    public ResponseEntity<LeaveRequest> hrActionOnLeave(
+            @PathVariable String id, 
+            @RequestBody Map<String, String> actionRequest) {
+        
         Optional<LeaveRequest> optional = leaveRequestRepository.findById(id);
         if (optional.isPresent()) {
             LeaveRequest leave = optional.get();
-            leave.setStatus("Rejected");
+            String action = actionRequest.get("action");
+            String reason = actionRequest.get("reason");
+            
+            if ("approve".equalsIgnoreCase(action)) {
+                leave.setStatus("Approved");
+                leave.setRejectionReason(null);
+            } else if ("reject".equalsIgnoreCase(action)) {
+                leave.setStatus("Rejected");
+                leave.setRejectionReason(reason);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+            
             return ResponseEntity.ok(leaveRequestRepository.save(leave));
         }
         return ResponseEntity.notFound().build();

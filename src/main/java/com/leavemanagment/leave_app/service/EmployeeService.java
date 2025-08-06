@@ -60,6 +60,12 @@ public class EmployeeService {
         return employeeRepository.findByDepartment(department);
     }
     
+    // Get employee ID by name
+    public String getEmployeeIdByName(String employeeName) {
+        Optional<Employee> employee = employeeRepository.findByFullName(employeeName);
+        return employee.map(Employee::getEmployeeId).orElse(null);
+    }
+    
     // Update employee leave status
     public void updateEmployeeLeaveStatus(String employeeId, boolean isOnLeave) {
         Optional<Employee> employeeOpt = employeeRepository.findByEmployeeId(employeeId);

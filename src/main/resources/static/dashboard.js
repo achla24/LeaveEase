@@ -29,6 +29,9 @@ class LeaveDashboard {
         // Update user role display
         this.updateUserInfo();
         
+        // Update dashboard title based on role
+        this.updateDashboardTitle();
+        
         // Show/hide HR-specific sections based on role
         if (this.userRole === 'hr') {
             this.showHRFeatures();
@@ -47,6 +50,23 @@ class LeaveDashboard {
         
         // Load user profile for header
         this.loadHeaderUserInfo();
+    }
+    
+    updateDashboardTitle() {
+        const dashboardTitle = document.getElementById('dashboardTitle');
+        if (dashboardTitle) {
+            if (this.userRole === 'hr') {
+                dashboardTitle.textContent = 'HR Management Dashboard';
+                dashboardTitle.classList.add('hr-title');
+                // Update page title for HR
+                document.title = 'HR Management Dashboard - Leave App';
+            } else {
+                dashboardTitle.textContent = 'Employee Leave Management';
+                dashboardTitle.classList.remove('hr-title');
+                // Update page title for employees
+                document.title = 'Employee Leave Management - Leave App';
+            }
+        }
     }
     
     async loadHeaderUserInfo() {
@@ -102,14 +122,20 @@ class LeaveDashboard {
 
     
     showHRFeatures() {
-        // Add HR-specific stats cards
-        this.addHRStatsCards();
-        
-        // Add HR tab if not exists
-        this.addHRTab();
-        
-        // Show approve/reject buttons in history
+        // Show HR tab and add hr-user class to body
         document.body.classList.add('hr-user');
+        
+        // Load HR data
+        this.loadHRData();
+        
+        // Update dashboard title for HR
+        this.updateDashboardTitle('HR Management');
+        
+        // Show the HR Management tab
+        const hrTab = document.querySelector('.nav-tab[data-tab="hr-management"]');
+        if (hrTab) {
+            hrTab.style.display = 'flex';
+        }
     }
     
     hideHRFeatures() {
@@ -275,7 +301,7 @@ class LeaveDashboard {
                 } else if (targetTab === 'calendar') {
                     this.loadCalendarData();
                 } else if (targetTab === 'hr-management' && this.userRole === 'hr') {
-                    this.loadHRData();
+                    this.loadHRManagementData();
                 }
             });
         });
@@ -290,6 +316,11 @@ class LeaveDashboard {
                 this.loadTeamOnLeave(),
                 this.loadNotifications()
             ]);
+
+            // Load HR-specific data if user is HR
+            if (this.getUserRole() === 'hr') {
+                await this.loadLateAttendanceChart();
+            }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
         }
@@ -743,6 +774,8 @@ class LeaveDashboard {
         try {
             console.log('📋 Loading leave history for current user...');
             
+
+            
             // Use user-specific endpoint instead of all leaves
             const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
             
@@ -760,7 +793,7 @@ class LeaveDashboard {
                 // Show message when no leaves found
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td colspan="7" style="text-align: center; padding: 20px; color: #64748b;">
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #64748b;">
                         <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
                             <span style="font-size: 24px;">📋</span>
                             <span>No leave requests found</span>
@@ -778,12 +811,18 @@ class LeaveDashboard {
             leaves.forEach(leave => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${leave.employeeName}</td>
                     <td>${this.formatDate(leave.startDate)}</td>
                     <td>${this.formatDate(leave.endDate)}</td>
                     <td>${this.calculateDuration(leave.startDate, leave.endDate)} days</td>
                     <td>${leave.leaveType || 'Annual'}</td>
-                    <td><span class="status-badge status-${leave.status.toLowerCase()}">${leave.status}</span></td>
+                    <td>
+                        <span class="status-badge status-${leave.status.toLowerCase()}">${leave.status}</span>
+                        ${leave.rejectionReason ? `
+                            <br><small style="color: #dc2626; font-size: 11px; margin-top: 4px; display: block;">
+                                ❌ ${leave.rejectionReason}
+                            </small>
+                        ` : ''}
+                    </td>
                     <td>
                         ${leave.status === 'Pending' ? `
                             <button class="action-btn cancel-btn" onclick="dashboard.cancelLeaveRequest('${leave.id}')" title="Cancel Request">
@@ -806,7 +845,7 @@ class LeaveDashboard {
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 20px; color: #ef4444;">
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #ef4444;">
                         <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
                             <span style="font-size: 24px;">⚠️</span>
                             <span>Error loading leave history</span>
@@ -817,6 +856,8 @@ class LeaveDashboard {
             `;
         }
     }
+    
+
 
     async handleFormSubmit(e) {
         e.preventDefault();
@@ -953,6 +994,122 @@ class LeaveDashboard {
         }
     }
     
+    // HR-specific methods
+    async approveLeaveRequest(leaveId) {
+        if (!confirm('Are you sure you want to approve this leave request?')) {
+            return;
+        }
+        
+        try {
+            console.log('✅ Approving leave request:', leaveId);
+            
+            const response = await fetch(`${this.baseURL}/leaves/${leaveId}/approve`, {
+                method: 'PUT'
+            });
+            
+            if (response.ok) {
+                console.log('✅ Leave request approved successfully');
+                this.showNotification('Leave request approved successfully!', 'success');
+                this.loadHRData(); // Refresh HR data
+            } else {
+                throw new Error(`Failed to approve leave request: ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.error('Error approving leave request:', error);
+            this.showNotification('Error approving leave request. Please try again.', 'error');
+        }
+    }
+    
+    showRejectionModal(leaveId) {
+        // Find the request details
+        const request = this.allHRRequests?.find(r => r.id === leaveId);
+        if (!request) {
+            this.showNotification('Request not found', 'error');
+            return;
+        }
+        
+        // Store the leave ID for the rejection
+        this.currentRejectionLeaveId = leaveId;
+        
+        // Populate the modal with request details
+        const detailsContainer = document.getElementById('rejectionRequestDetails');
+        detailsContainer.innerHTML = `
+            <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                    <div>
+                        <div style="font-size: 12px; color: #64748b; font-weight: 500;">Employee</div>
+                        <div style="font-size: 14px; color: #1e293b; font-weight: 600;">${request.employeeName}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #64748b; font-weight: 500;">Leave Type</div>
+                        <div style="font-size: 14px; color: #1e293b; font-weight: 600;">${request.leaveType}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #64748b; font-weight: 500;">Duration</div>
+                        <div style="font-size: 14px; color: #1e293b; font-weight: 600;">${request.duration} days</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #64748b; font-weight: 500;">Dates</div>
+                        <div style="font-size: 14px; color: #1e293b; font-weight: 600;">${this.formatDate(request.startDate)} - ${this.formatDate(request.endDate)}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div style="font-size: 12px; color: #64748b; font-weight: 500;">Reason for Leave</div>
+                    <div style="font-size: 14px; color: #1e293b; margin-top: 4px;">${request.reason}</div>
+                </div>
+            </div>
+        `;
+        
+        // Clear previous rejection reason
+        document.getElementById('rejectionReason').value = '';
+        
+        // Show the modal
+        document.getElementById('hrRejectionModal').style.display = 'block';
+    }
+    
+    async confirmRejectLeave() {
+        const rejectionReason = document.getElementById('rejectionReason').value.trim();
+        
+        if (!rejectionReason) {
+            alert('Please provide a reason for rejection.');
+            return;
+        }
+        
+        if (rejectionReason.length < 10) {
+            alert('Please provide a more detailed reason for rejection (at least 10 characters).');
+            return;
+        }
+        
+        try {
+            console.log('❌ Rejecting leave request:', this.currentRejectionLeaveId);
+            console.log('Reason:', rejectionReason);
+            
+            const response = await fetch(`${this.baseURL}/leaves/${this.currentRejectionLeaveId}/reject`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    rejectionReason: rejectionReason
+                })
+            });
+            
+            if (response.ok) {
+                console.log('✅ Leave request rejected successfully');
+                this.showNotification('Leave request rejected successfully!', 'success');
+                this.closeHRRejectionModal();
+                this.loadHRData(); // Refresh HR data
+            } else {
+                throw new Error(`Failed to reject leave request: ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.error('Error rejecting leave request:', error);
+            this.showNotification('Error rejecting leave request. Please try again.', 'error');
+        }
+    }
+    
     async cancelLeaveRequest(leaveId) {
         if (!confirm('Are you sure you want to cancel this leave request?')) {
             return;
@@ -1024,7 +1181,9 @@ class LeaveDashboard {
             await Promise.all([
                 this.loadHRStats(),
                 this.loadPendingRequests(),
-                this.loadDepartmentStats()
+                this.loadAllRequests(),
+                this.loadLateAttendanceData(),
+                this.loadHRHistoryData()
             ]);
         } catch (error) {
             console.error('Error loading HR data:', error);
@@ -1033,54 +1192,87 @@ class LeaveDashboard {
     
     async loadHRStats() {
         try {
+            console.log('📊 Loading HR stats...');
+            
             const response = await fetch(`${this.baseURL}/api/dashboard/hr/employee-stats`);
             const stats = await response.json();
             
+            console.log('✅ Loaded HR stats:', stats);
+            
             // Update HR-specific stat cards
-            document.getElementById('totalEmployeesCount').textContent = stats.totalEmployees;
-            document.getElementById('employeesOnLeaveCount').textContent = stats.employeesOnLeave;
-            document.getElementById('employeesPresentCount').textContent = stats.employeesPresent;
-            document.getElementById('pendingApprovalsCount').textContent = stats.pendingApprovals;
+            document.getElementById('hrTotalEmployees').textContent = stats.totalEmployees || 0;
+            document.getElementById('hrPendingRequests').textContent = stats.pendingApprovals || 0;
+            document.getElementById('hrApprovedRequests').textContent = stats.approvedRequests || 0;
+            document.getElementById('hrRejectedRequests').textContent = stats.rejectedRequests || 0;
             
         } catch (error) {
             console.error('Error loading HR stats:', error);
         }
     }
     
+
+    
     async loadPendingRequests() {
         try {
+            console.log('📋 Loading pending requests for HR...');
+            
             const response = await fetch(`${this.baseURL}/api/dashboard/hr/pending-requests`);
             const pendingRequests = await response.json();
             
-            const container = document.getElementById('pendingRequestsList');
+            console.log('✅ Loaded pending requests:', pendingRequests);
+            
+            const container = document.getElementById('hrPendingRequestsList');
             if (!container) return;
             
             container.innerHTML = '';
             
             if (pendingRequests.length === 0) {
-                container.innerHTML = '<p class="no-data">No pending requests</p>';
+                container.innerHTML = `
+                    <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">✅</div>
+                        <div>No pending leave requests</div>
+                        <div style="font-size: 14px; margin-top: 5px;">All requests have been processed</div>
+                    </div>
+                `;
                 return;
             }
             
             pendingRequests.forEach(request => {
                 const requestCard = document.createElement('div');
-                requestCard.className = 'pending-request-card';
+                requestCard.className = 'hr-request-card';
                 
                 requestCard.innerHTML = `
-                    <div class="request-header">
-                        <h4>${request.employeeName}</h4>
-                        <span class="request-date">${this.formatDate(request.startDate)} - ${this.formatDate(request.endDate)}</span>
+                    <div class="hr-request-header">
+                        <div class="hr-request-employee">${request.employeeName}</div>
+                        <span class="hr-request-status pending">Pending</span>
                     </div>
-                    <div class="request-details">
-                        <p><strong>Type:</strong> ${request.leaveType}</p>
-                        <p><strong>Duration:</strong> ${request.duration} days</p>
-                        <p><strong>Reason:</strong> ${request.reason}</p>
+                    <div class="hr-request-details">
+                        <div class="hr-request-detail">
+                            <div class="hr-request-detail-label">Start Date</div>
+                            <div class="hr-request-detail-value">${this.formatDate(request.startDate)}</div>
+                        </div>
+                        <div class="hr-request-detail">
+                            <div class="hr-request-detail-label">End Date</div>
+                            <div class="hr-request-detail-value">${this.formatDate(request.endDate)}</div>
+                        </div>
+                        <div class="hr-request-detail">
+                            <div class="hr-request-detail-label">Duration</div>
+                            <div class="hr-request-detail-value">${request.duration} days</div>
+                        </div>
+                        <div class="hr-request-detail">
+                            <div class="hr-request-detail-label">Leave Type</div>
+                            <div class="hr-request-detail-value">${request.leaveType}</div>
+                        </div>
                     </div>
-                    <div class="request-actions">
-                        <button class="action-btn approve-btn" onclick="dashboard.updateLeaveStatus('${request.id}', 'approve')">
+                    <div class="hr-request-reason">
+                        <div class="hr-request-reason-label">Reason for Leave</div>
+                        <div class="hr-request-reason-text">${request.reason}</div>
+                    </div>
+                    <div class="hr-request-actions">
+                        <button class="hr-action-btn hr-approve-btn" onclick="dashboard.approveLeaveRequest('${request.id}')">
                             ✅ Approve
                         </button>
-                        <button class="action-btn reject-btn" onclick="dashboard.updateLeaveStatus('${request.id}', 'reject')">
+                        <button class="hr-action-btn hr-reject-btn" onclick="dashboard.showRejectionModal('${request.id}')">
                             ❌ Reject
                         </button>
                     </div>
@@ -1091,39 +1283,147 @@ class LeaveDashboard {
             
         } catch (error) {
             console.error('Error loading pending requests:', error);
+            const container = document.getElementById('hrPendingRequestsList');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error" style="text-align: center; padding: 20px; color: #ef4444;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                        <div>Error loading pending requests</div>
+                        <div style="font-size: 14px; margin-top: 5px;">${error.message}</div>
+                    </div>
+                `;
+            }
         }
     }
     
-    async loadDepartmentStats() {
+
+    
+    async loadAllRequests() {
         try {
-            const response = await fetch(`${this.baseURL}/api/dashboard/hr/department-stats`);
-            const stats = await response.json();
+            console.log('📊 Loading all requests for HR...');
             
-            const container = document.getElementById('departmentStats');
-            if (!container) return;
+            const response = await fetch(`${this.baseURL}/api/dashboard/hr/all-requests`);
+            const allRequests = await response.json();
             
-            container.innerHTML = '';
+            console.log('✅ Loaded all requests:', allRequests);
             
-            const departmentLeaves = stats.departmentLeaves;
-            
-            Object.entries(departmentLeaves).forEach(([department, leaves]) => {
-                const deptCard = document.createElement('div');
-                deptCard.className = 'department-card';
-                
-                deptCard.innerHTML = `
-                    <div class="dept-name">${department}</div>
-                    <div class="dept-leaves">${leaves} days</div>
-                    <div class="dept-bar">
-                        <div class="dept-bar-fill" style="width: ${(leaves / 20) * 100}%"></div>
-                    </div>
-                `;
-                
-                container.appendChild(deptCard);
-            });
+            this.allHRRequests = allRequests; // Store for filtering
+            this.renderAllRequests(allRequests);
             
         } catch (error) {
-            console.error('Error loading department stats:', error);
+            console.error('Error loading all requests:', error);
+            const container = document.getElementById('hrAllRequestsList');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error" style="text-align: center; padding: 20px; color: #ef4444;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                        <div>Error loading all requests</div>
+                        <div style="font-size: 14px; margin-top: 5px;">${error.message}</div>
+                    </div>
+                `;
+            }
         }
+    }
+    
+
+    
+    renderAllRequests(requests) {
+        const container = document.getElementById('hrAllRequestsList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (requests.length === 0) {
+            container.innerHTML = `
+                <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">📋</div>
+                    <div>No leave requests found</div>
+                    <div style="font-size: 14px; margin-top: 5px;">Employees will appear here when they submit requests</div>
+                </div>
+            `;
+            return;
+        }
+        
+        requests.forEach(request => {
+            const requestCard = document.createElement('div');
+            requestCard.className = 'hr-request-card';
+            
+            const statusClass = request.status.toLowerCase();
+            const statusIcon = this.getStatusIcon(request.status);
+            
+            requestCard.innerHTML = `
+                <div class="hr-request-header">
+                    <div class="hr-request-employee">${request.employeeName}</div>
+                    <span class="hr-request-status ${statusClass}">${statusIcon} ${request.status}</span>
+                </div>
+                <div class="hr-request-details">
+                    <div class="hr-request-detail">
+                        <div class="hr-request-detail-label">Start Date</div>
+                        <div class="hr-request-detail-value">${this.formatDate(request.startDate)}</div>
+                    </div>
+                    <div class="hr-request-detail">
+                        <div class="hr-request-detail-label">End Date</div>
+                        <div class="hr-request-detail-value">${this.formatDate(request.endDate)}</div>
+                    </div>
+                    <div class="hr-request-detail">
+                        <div class="hr-request-detail-label">Duration</div>
+                        <div class="hr-request-detail-value">${request.duration} days</div>
+                    </div>
+                    <div class="hr-request-detail">
+                        <div class="hr-request-detail-label">Leave Type</div>
+                        <div class="hr-request-detail-value">${request.leaveType}</div>
+                    </div>
+                </div>
+                <div class="hr-request-reason">
+                    <div class="hr-request-reason-label">Reason for Leave</div>
+                    <div class="hr-request-reason-text">${request.reason}</div>
+                </div>
+                ${request.rejectionReason ? `
+                    <div class="hr-request-rejection-reason">
+                        <div class="hr-request-rejection-reason-label">Rejection Reason</div>
+                        <div class="hr-request-rejection-reason-text">${request.rejectionReason}</div>
+                    </div>
+                ` : ''}
+                <div class="hr-request-actions">
+                    ${request.status === 'Pending' ? `
+                        <button class="hr-action-btn hr-approve-btn" onclick="dashboard.approveLeaveRequest('${request.id}')">
+                            ✅ Approve
+                        </button>
+                        <button class="hr-action-btn hr-reject-btn" onclick="dashboard.showRejectionModal('${request.id}')">
+                            ❌ Reject
+                        </button>
+                    ` : `
+                        <span style="color: #64748b; font-size: 14px;">
+                            ${request.status === 'Approved' ? '✅ Approved' : '❌ Rejected'}
+                        </span>
+                    `}
+                </div>
+            `;
+            
+            container.appendChild(requestCard);
+        });
+        
+
+    }
+    
+    getStatusIcon(status) {
+        switch (status) {
+            case 'Pending': return '⏳';
+            case 'Approved': return '✅';
+            case 'Rejected': return '❌';
+            default: return '📋';
+        }
+    }
+    
+    filterHRRequests() {
+        const filterValue = document.getElementById('hrStatusFilter').value;
+        let filteredRequests = this.allHRRequests || [];
+        
+        if (filterValue !== 'all') {
+            filteredRequests = filteredRequests.filter(request => request.status === filterValue);
+        }
+        
+        this.renderAllRequests(filteredRequests);
     }
     
     // ========== CALENDAR METHODS ==========
@@ -1135,7 +1435,7 @@ class LeaveDashboard {
             // Load user's leave data
             await this.loadUserLeaveData();
             
-            // Load user's attendance data (late days) - for now we'll simulate this
+            // Load user's attendance data (late days) - currently not implemented
             await this.loadUserAttendanceData();
             
             // Render the calendar
@@ -1187,19 +1487,11 @@ class LeaveDashboard {
     
     async loadUserAttendanceData() {
         try {
-            // For now, simulate some late days
+            // For now, we'll use an empty array since we don't have a real attendance API
             // In a real application, this would come from an attendance API
-            const today = new Date();
-            const currentMonth = today.getMonth();
-            const currentYear = today.getFullYear();
+            this.calendarData.lateDays = [];
             
-            this.calendarData.lateDays = [
-                { date: new Date(currentYear, currentMonth, 5), reason: 'Traffic jam' },
-                { date: new Date(currentYear, currentMonth, 12), reason: 'Overslept' },
-                { date: new Date(currentYear, currentMonth, 18), reason: 'Medical appointment' }
-            ];
-            
-            console.log('✅ Loaded late days:', this.calendarData.lateDays.length);
+            console.log('✅ No late days data available (attendance API not implemented)');
             
         } catch (error) {
             console.error('Error loading attendance data:', error);
@@ -1393,6 +1685,441 @@ class LeaveDashboard {
         document.getElementById('monthLateDays').textContent = monthLateDays;
         document.getElementById('monthWorkingDays').textContent = workingDays;
     }
+    
+    // ========== LATE ATTENDANCE METHODS ==========
+    
+    async loadLateAttendanceData() {
+        try {
+            console.log('⏰ Loading late attendance data...');
+            
+            // Load employee list for dropdown
+            await this.loadEmployeeList();
+            
+            // Load recent late records
+            await this.loadLateRecords();
+            
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('lateDate').value = today;
+            
+        } catch (error) {
+            console.error('Error loading late attendance data:', error);
+        }
+    }
+
+    async loadLateAttendanceChart() {
+        try {
+            console.log('📊 Loading late attendance chart...');
+            
+            // Get current month's late attendance data
+            const currentDate = new Date();
+            const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
+            const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
+            
+            const response = await fetch(`${this.baseURL}/api/late-attendance/range?startDate=${startDate}&endDate=${endDate}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const lateRecords = result.data || [];
+            
+            // Group by employee and count late days
+            const employeeLateCounts = {};
+            lateRecords.forEach(record => {
+                if (employeeLateCounts[record.employeeName]) {
+                    employeeLateCounts[record.employeeName]++;
+                } else {
+                    employeeLateCounts[record.employeeName] = 1;
+                }
+            });
+            
+            // Create chart data
+            const labels = Object.keys(employeeLateCounts);
+            const data = Object.values(employeeLateCounts);
+            
+            // Update chart summary
+            const totalLateDays = data.reduce((sum, count) => sum + count, 0);
+            const employeesAffected = labels.length;
+            
+            document.getElementById('chartTotalLateDays').textContent = totalLateDays;
+            document.getElementById('chartLateEmployees').textContent = employeesAffected;
+            
+            // Create or update chart
+            const ctx = document.getElementById('lateAttendanceChart');
+            if (ctx) {
+                if (this.lateAttendanceChart) {
+                    this.lateAttendanceChart.destroy();
+                }
+                
+                this.lateAttendanceChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Late Days This Month',
+                            data: data,
+                            backgroundColor: '#DC2626',
+                            borderColor: '#B91C1C',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error loading late attendance chart:', error);
+            // Show empty state
+            document.getElementById('chartTotalLateDays').textContent = '0';
+            document.getElementById('chartLateEmployees').textContent = '0';
+        }
+    }
+
+    showPendingLeaves() {
+        console.log('📋 Showing pending leaves...');
+        
+        // Scroll to the HR Management section
+        const hrManagementSection = document.querySelector('.dashboard-sub-section h3');
+        if (hrManagementSection) {
+            hrManagementSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Show notification
+        this.showNotification('Showing pending leave requests', 'info');
+    }
+
+    showTeamOnLeave() {
+        console.log('👥 Showing team on leave...');
+        
+        // Scroll to the Team on Leave section in the main dashboard
+        const teamOnLeaveSection = document.querySelector('#teamOnLeaveSection');
+        if (teamOnLeaveSection) {
+            teamOnLeaveSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Show notification
+        this.showNotification('Showing team members currently on leave', 'info');
+    }
+
+    async loadHRManagementData() {
+        console.log('👨‍💼 Loading HR Management data...');
+        
+        try {
+            await Promise.all([
+                this.loadHRStats(),
+                this.loadPendingRequests(),
+                this.loadAllRequests(),
+                this.loadLateAttendanceData()
+            ]);
+            
+            this.showNotification('HR Management data loaded successfully', 'success');
+        } catch (error) {
+            console.error('Error loading HR Management data:', error);
+            this.showNotification('Error loading HR Management data', 'error');
+        }
+    }
+
+    async loadHRHistoryData() {
+        try {
+            console.log('📋 Loading HR history data...');
+            
+
+            
+            const response = await fetch(`${this.baseURL}/api/dashboard/hr/all-requests`);
+            const allRequests = await response.json();
+            
+            const tbody = document.getElementById('hrHistoryTableBody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            if (allRequests.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #64748b;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">📋</span>
+                                <span>No leave requests found</span>
+                                <span style="font-size: 14px;">No leave history available</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            allRequests.forEach(leave => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${leave.employeeName}</td>
+                    <td>${this.formatDate(leave.startDate)}</td>
+                    <td>${this.formatDate(leave.endDate)}</td>
+                    <td>${this.calculateDuration(leave.startDate, leave.endDate)} days</td>
+                    <td>${leave.leaveType}</td>
+                    <td>
+                        <span class="status-badge status-${leave.status.toLowerCase()}">${leave.status}</span>
+                        ${leave.rejectionReason ? `
+                            <br><small style="color: #dc2626; font-size: 11px; margin-top: 4px; display: block;">
+                                ❌ ${leave.rejectionReason}
+                            </small>
+                        ` : ''}
+                    </td>
+                    <td>
+                        ${leave.status === 'Pending' ? `
+                            <button class="action-btn cancel-btn" onclick="dashboard.cancelLeaveRequest('${leave.id}')" title="Cancel Request">
+                                ❌ Cancel
+                            </button>
+                        ` : `
+                            <span style="color: #64748b; font-size: 14px;">
+                                ${leave.status === 'Approved' ? '✅ Approved' : '❌ ' + leave.status}
+                            </span>
+                        `}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+        } catch (error) {
+            console.error('Error loading HR history data:', error);
+            // Show empty state
+            const tbody = document.getElementById('hrHistoryTableBody');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #64748b;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">❌</span>
+                                <span>Error loading history</span>
+                                <span style="font-size: 14px;">Please try again later</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+    }
+
+
+    
+    async loadEmployeeList() {
+        try {
+            // Get real employee list from backend
+            const response = await fetch(`${this.baseURL}/api/employees`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const employees = result.data || [];
+            
+            const select = document.getElementById('lateEmployeeName');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">Select Employee</option>';
+            employees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.fullName;
+                option.textContent = employee.fullName;
+                select.appendChild(option);
+            });
+            
+        } catch (error) {
+            console.error('Error loading employee list:', error);
+            // Fallback to empty list
+            const select = document.getElementById('lateEmployeeName');
+            if (select) {
+                select.innerHTML = '<option value="">No employees available</option>';
+            }
+        }
+    }
+    
+    async loadLateRecords() {
+        try {
+            // Get real late records from backend
+            const response = await fetch(`${this.baseURL}/api/late-attendance/range?startDate=2024-01-01&endDate=2024-12-31`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const lateRecords = result.data || [];
+            
+            this.renderLateRecords(lateRecords);
+            
+        } catch (error) {
+            console.error('Error loading late records:', error);
+            // Show empty state
+            this.renderLateRecords([]);
+        }
+    }
+    
+    renderLateRecords(records) {
+        const container = document.getElementById('lateRecordsList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (records.length === 0) {
+            container.innerHTML = `
+                <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">✅</div>
+                    <div>No late attendance records</div>
+                    <div style="font-size: 14px; margin-top: 5px;">All employees arrived on time</div>
+                </div>
+            `;
+            return;
+        }
+        
+        records.forEach(record => {
+            const recordCard = document.createElement('div');
+            recordCard.className = 'late-record-card';
+            
+            recordCard.innerHTML = `
+                <div class="late-record-header">
+                    <div class="late-record-employee">${record.employeeName}</div>
+                    <div class="late-record-date">${this.formatDate(record.date)}</div>
+                </div>
+                <div class="late-record-details">
+                    <div class="late-record-detail">
+                        <div class="late-record-detail-label">Reason</div>
+                        <div class="late-record-detail-value">${record.reason}</div>
+                    </div>
+                    <div class="late-record-detail">
+                        <div class="late-record-detail-label">Marked By</div>
+                        <div class="late-record-detail-value">${record.markedBy}</div>
+                    </div>
+                </div>
+                ${record.notes ? `
+                    <div class="late-record-notes">
+                        <div class="late-record-notes-label">Notes</div>
+                        <div class="late-record-notes-text">${record.notes}</div>
+                    </div>
+                ` : ''}
+            `;
+            
+            container.appendChild(recordCard);
+        });
+    }
+    
+    async markEmployeeLate() {
+        try {
+            const employeeName = document.getElementById('lateEmployeeName').value;
+            const date = document.getElementById('lateDate').value;
+            const reason = document.getElementById('lateReason').value;
+            const notes = document.getElementById('lateNotes').value;
+            
+            if (!employeeName || !date || !reason) {
+                this.showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            // Send request to backend
+            const response = await fetch(`${this.baseURL}/api/late-attendance/mark-late`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    employeeName: employeeName,
+                    date: date,
+                    reason: reason,
+                    notes: notes
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to mark employee as late');
+            }
+            
+            const result = await response.json();
+            this.showNotification(result.message || `Successfully marked ${employeeName} as late on ${this.formatDate(date)}`, 'success');
+            
+            // Clear form
+            document.getElementById('lateEmployeeName').value = '';
+            document.getElementById('lateDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('lateReason').value = '';
+            document.getElementById('lateNotes').value = '';
+            
+            // Reload late records
+            await this.loadLateRecords();
+            
+        } catch (error) {
+            console.error('Error marking employee as late:', error);
+            this.showNotification(error.message || 'Error marking employee as late', 'error');
+        }
+    }
+    
+    async filterLateRecords() {
+        const dateFilter = document.getElementById('lateDateFilter').value;
+        console.log('Filtering late records by date:', dateFilter);
+        
+        if (!dateFilter) {
+            // If no date filter, load all records
+            await this.loadLateRecords();
+            return;
+        }
+        
+        try {
+            // Get late records for specific date
+            const response = await fetch(`${this.baseURL}/api/late-attendance/date/${dateFilter}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const lateRecords = result.data || [];
+            
+            this.renderLateRecords(lateRecords);
+            
+        } catch (error) {
+            console.error('Error filtering late records:', error);
+            this.showNotification('Error filtering late records', 'error');
+        }
+    }
+    
+    // Update calendar to show late days for employees
+    async loadUserAttendanceData() {
+        try {
+            // Get real late attendance data from backend
+            const response = await fetch(`${this.baseURL}/api/late-attendance/my-late-records`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const lateRecords = result.data || [];
+            
+            // Convert to calendar format
+            this.calendarData.lateDays = lateRecords.map(record => ({
+                date: new Date(record.date),
+                reason: record.reason
+            }));
+            
+            console.log('✅ Loaded late days:', this.calendarData.lateDays.length);
+            
+        } catch (error) {
+            console.error('Error loading attendance data:', error);
+            this.calendarData.lateDays = [];
+        }
+    }
 }
 
 // Initialize dashboard when DOM is loaded
@@ -1558,6 +2285,16 @@ function saveProfileChanges() {
         window.dashboard.showNotification('Profile changes saved successfully!', 'success');
     }
     closeProfileModal();
+}
+
+// HR Rejection Modal Functions
+function closeHRRejectionModal() {
+    const modal = document.getElementById('hrRejectionModal');
+    modal.style.display = 'none';
+    // Clear the current rejection leave ID
+    if (window.dashboard) {
+        window.dashboard.currentRejectionLeaveId = null;
+    }
 }
 
 function showNotification(message, type = 'info') {

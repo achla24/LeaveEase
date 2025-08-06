@@ -28,6 +28,8 @@ public class LeaveRequest {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+    
+    private String rejectionReason; // New field for HR rejection reasons
 
     // Constructors
     public LeaveRequest() {
@@ -120,6 +122,14 @@ public class LeaveRequest {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
     
     // Helper method to calculate leave duration in days

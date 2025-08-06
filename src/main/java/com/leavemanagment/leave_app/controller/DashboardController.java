@@ -331,19 +331,23 @@ public class DashboardController {
         long pendingRequests = leaveRequestRepository.countByStatus("Pending");
         long totalRequests = leaveRequestRepository.count();
         long approvedRequests = leaveRequestRepository.countByStatus("Approved");
+        long rejectedRequests = leaveRequestRepository.countByStatus("Rejected");
         
         hrStats.put("pendingApprovals", pendingRequests);
         hrStats.put("totalRequests", totalRequests);
         hrStats.put("approvedRequests", approvedRequests);
+        hrStats.put("rejectedRequests", rejectedRequests);
         
         return hrStats;
     }
     
     @GetMapping("/hr/pending-requests")
     public List<Map<String, Object>> getPendingRequests() {
+        System.out.println("🔍 HR: Fetching pending requests...");
         List<LeaveRequest> pendingRequests = leaveRequestRepository.findByStatus("Pending");
+        System.out.println("📋 HR: Found " + pendingRequests.size() + " pending requests");
         
-        return pendingRequests.stream()
+        List<Map<String, Object>> result = pendingRequests.stream()
             .map(request -> {
                 Map<String, Object> requestInfo = new HashMap<>();
                 requestInfo.put("id", request.getId());
@@ -354,17 +358,23 @@ public class DashboardController {
                 requestInfo.put("leaveType", request.getLeaveType());
                 requestInfo.put("reason", request.getReason());
                 requestInfo.put("status", request.getStatus());
+                requestInfo.put("rejectionReason", request.getRejectionReason());
                 requestInfo.put("createdAt", request.getCreatedAt());
                 return requestInfo;
             })
             .collect(Collectors.toList());
+        
+        System.out.println("✅ HR: Returning " + result.size() + " pending requests");
+        return result;
     }
     
     @GetMapping("/hr/all-requests")
     public List<Map<String, Object>> getAllRequests() {
+        System.out.println("🔍 HR: Fetching all requests...");
         List<LeaveRequest> allRequests = leaveRequestRepository.findAll();
+        System.out.println("📋 HR: Found " + allRequests.size() + " total requests");
         
-        return allRequests.stream()
+        List<Map<String, Object>> result = allRequests.stream()
             .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt())) // Latest first
             .map(request -> {
                 Map<String, Object> requestInfo = new HashMap<>();
@@ -376,22 +386,48 @@ public class DashboardController {
                 requestInfo.put("leaveType", request.getLeaveType());
                 requestInfo.put("reason", request.getReason());
                 requestInfo.put("status", request.getStatus());
+                requestInfo.put("rejectionReason", request.getRejectionReason());
                 requestInfo.put("createdAt", request.getCreatedAt());
                 return requestInfo;
             })
             .collect(Collectors.toList());
+        
+        System.out.println("✅ HR: Returning " + result.size() + " all requests");
+        return result;
     }
     
     @GetMapping("/hr/department-stats")
     public Map<String, Object> getDepartmentStats() {
         List<LeaveRequest> allRequests = leaveRequestRepository.findAll();
         
-        // Group by department (we'll extract from employee name for now)
+        // Calculate real department statistics from actual leave requests
         Map<String, Long> departmentLeaves = new HashMap<>();
-        departmentLeaves.put("Engineering", 15L);
-        departmentLeaves.put("HR", 8L);
-        departmentLeaves.put("Marketing", 12L);
-        departmentLeaves.put("Sales", 10L);
+        
+        // Get all employees to map names to departments
+        List<com.leavemanagment.leave_app.model.Employee> allEmployees = employeeService.getAllActiveEmployees();
+        Map<String, String> employeeToDepartment = new HashMap<>();
+        
+        for (com.leavemanagment.leave_app.model.Employee employee : allEmployees) {
+            employeeToDepartment.put(employee.getFullName(), employee.getDepartment());
+        }
+        
+        for (LeaveRequest request : allRequests) {
+            if ("Approved".equals(request.getStatus()) && request.getStartDate() != null && request.getEndDate() != null) {
+                String employeeName = request.getEmployeeName();
+                long days = request.getLeaveDuration();
+                
+                // Get department from our mapping
+                String department = employeeToDepartment.get(employeeName);
+                if (department != null && !department.trim().isEmpty()) {
+                    departmentLeaves.merge(department, days, Long::sum);
+                }
+            }
+        }
+        
+        // If no real data, provide empty map
+        if (departmentLeaves.isEmpty()) {
+            departmentLeaves.put("No Data", 0L);
+        }
         
         Map<String, Object> deptStats = new HashMap<>();
         deptStats.put("departmentLeaves", departmentLeaves);

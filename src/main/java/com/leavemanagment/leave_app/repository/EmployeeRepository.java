@@ -41,4 +41,7 @@ public interface EmployeeRepository extends MongoRepository<Employee, String> {
     
     // Check if employee ID exists
     boolean existsByEmployeeId(String employeeId);
+    
+    // Find employee by full name
+    Optional<Employee> findByFullName(String fullName);
 }

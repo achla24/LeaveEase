@@ -13,7 +13,7 @@
     <div class="dashboard-container">
         <!-- Header -->
         <header class="dashboard-header">
-            <h1>Employee Leave Management</h1>
+            <h1 id="dashboardTitle">Employee Leave Management</h1>
             <div class="header-actions">
                 <div class="user-profile" onclick="showProfile()" style="cursor: pointer;" title="Click to view profile">
                     <div class="user-avatar"></div>
@@ -39,7 +39,7 @@
                 <span class="tab-icon">📝</span>
                 Request Leave
             </button>
-            <button class="nav-tab" data-tab="calendar">
+            <button class="nav-tab employee-only" data-tab="calendar">
                 <span class="tab-icon">📅</span>
                 Calendar
             </button>
@@ -47,6 +47,12 @@
                 <span class="tab-icon">📋</span>
                 History
             </button>
+
+            <button class="nav-tab hr-only" data-tab="hr-management" style="display: none;">
+                <span class="tab-icon">👨‍💼</span>
+                HR Management
+            </button>
+
         </nav>
 
         <!-- Main Content -->
@@ -55,7 +61,7 @@
             <div id="dashboard" class="tab-content active">
                 <!-- Statistics Cards -->
                 <div class="stats-grid">
-                    <div class="stat-card">
+                    <div class="stat-card employee-only">
                         <div class="stat-header">
                             <span class="stat-title">Total Leave Taken</span>
                             <span class="stat-icon">📊</span>
@@ -64,7 +70,7 @@
                         <div class="stat-subtitle" id="remainingDays">29 days remaining this year</div>
                     </div>
 
-                    <div class="stat-card">
+                    <div class="stat-card employee-only">
                         <div class="stat-header">
                             <span class="stat-title">Approval Rate</span>
                             <span class="stat-icon">⏰</span>
@@ -73,29 +79,29 @@
                         <div class="stat-subtitle">29 days remaining this year</div>
                     </div>
 
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="dashboard.showPendingLeaves()" style="cursor: pointer;">
                         <div class="stat-header">
-                            <span class="stat-title">Pending Request</span>
+                            <span class="stat-title">Pending Requests</span>
                             <span class="stat-icon">📋</span>
                         </div>
                         <div class="stat-value" id="pendingRequests">1</div>
-                        <div class="stat-subtitle">29 days remaining this year</div>
+                        <div class="stat-subtitle">Click to view details</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <span class="stat-title">Team Member on Leave</span>
-                            <span class="stat-icon">👥</span>
-                        </div>
-                        <div class="stat-value" id="teamMembersOnLeave">2</div>
-                        <div class="stat-subtitle">29 days remaining this year</div>
-                    </div>
+                                                <div class="stat-card" onclick="dashboard.showTeamOnLeave()" style="cursor: pointer;">
+                                <div class="stat-header">
+                                    <span class="stat-title">Team Members on Leave</span>
+                                    <span class="stat-icon">👥</span>
+                                </div>
+                                <div class="stat-value" id="teamMembersOnLeave">2</div>
+                                <div class="stat-subtitle">Click to view details</div>
+                            </div>
                 </div>
 
                 <!-- Content Grid -->
                 <div class="content-grid">
-                    <!-- Leave Overview Chart -->
-                    <div class="chart-section">
+                    <!-- Leave Overview Chart (Employee Only) -->
+                    <div class="chart-section employee-only">
                         <h3>My Leave Overview</h3>
                         <p class="chart-subtitle">Loading your leave data...</p>
                         <div class="chart-container">
@@ -123,6 +129,31 @@
                         </div>
                     </div>
 
+                    <!-- Late Attendance Chart (HR Only) -->
+                    <div class="chart-section hr-only">
+                        <h3>Late Attendance Overview</h3>
+                        <p class="chart-subtitle">Employee late attendance this month</p>
+                        <div class="chart-container">
+                            <canvas id="lateAttendanceChart"></canvas>
+                        </div>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background-color: #DC2626;"></span>
+                                <span>Late Days</span>
+                            </div>
+                        </div>
+                        <div class="chart-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Total Late Days</span>
+                                <span class="summary-value" id="chartTotalLateDays">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Employees Affected</span>
+                                <span class="summary-value" id="chartLateEmployees">--</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Upcoming Leave -->
                     <div class="upcoming-section">
                         <h3>Upcoming Leave</h3>
@@ -145,7 +176,7 @@
                     </div>
 
                     <!-- Team Members on Leave -->
-                    <div class="team-section">
+                    <div id="teamOnLeaveSection" class="team-section">
                         <h3>Team Members on Leave Today</h3>
                         <p class="section-subtitle">Colleagues who are absent today</p>
                         <div id="teamOnLeaveList" class="team-list">
@@ -153,6 +184,8 @@
                         </div>
                     </div>
                 </div>
+
+
             </div>
 
             <!-- Request Leave Tab -->
@@ -285,7 +318,7 @@
                         <table class="history-table">
                             <thead>
                                 <tr>
-                                    <th>Employee</th>
+                                    <th class="employee-only">Employee</th>
                                     <th>Start Date</th>
                                     <th>End Date</th>
                                     <th>Duration</th>
@@ -301,6 +334,99 @@
                     </div>
                 </div>
             </div>
+
+            <!-- HR Management Tab -->
+            <div id="hr-management" class="tab-content hr-only" style="display: none;">
+                <div class="hr-management-dashboard">
+                    <h2>👨‍💼 HR Management Dashboard</h2>
+                    
+                    <!-- Leave Management Section -->
+                    <div class="hr-section">
+                        <h3>📋 Leave Request Management</h3>
+                        <p class="section-subtitle">Approve or reject employee leave requests</p>
+                        
+                        <!-- Pending Leave Requests -->
+                        <div class="pending-leaves-section">
+                            <h4>⏳ Pending Leave Requests</h4>
+                            <div id="hrPendingRequestsList" class="hr-requests-list">
+                                <!-- Pending requests will be loaded here -->
+                            </div>
+                        </div>
+
+                        <!-- All Leave Requests -->
+                        <div class="all-leaves-section">
+                            <h4>📊 All Leave Requests</h4>
+                            <div class="hr-filters">
+                                <select id="hrStatusFilter" onchange="dashboard.filterHRRequests()">
+                                    <option value="all">All Status</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Rejected">Rejected</option>
+                                </select>
+                            </div>
+                            <div id="hrAllRequestsList" class="hr-requests-list">
+                                <!-- All requests will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Late Attendance Management Section -->
+                    <div class="hr-section">
+                        <h3>⏰ Late Attendance Management</h3>
+                        <p class="section-subtitle">Mark and track employee late attendance</p>
+                        
+                        <!-- Mark Late Form -->
+                        <div class="late-attendance-form">
+                            <h4>📝 Mark Employee as Late</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="lateEmployeeName">Employee Name *</label>
+                                    <select id="lateEmployeeName" required>
+                                        <option value="">Select Employee</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lateDate">Date *</label>
+                                    <input type="date" id="lateDate" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="lateReason">Reason for Late *</label>
+                                    <select id="lateReason" required>
+                                        <option value="">Select Reason</option>
+                                        <option value="Traffic Delay">Traffic Delay</option>
+                                        <option value="Public Transport Issue">Public Transport Issue</option>
+                                        <option value="Personal Emergency">Personal Emergency</option>
+                                        <option value="Overslept">Overslept</option>
+                                        <option value="Medical Appointment">Medical Appointment</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lateNotes">Additional Notes</label>
+                                    <textarea id="lateNotes" rows="2" placeholder="Any additional notes..."></textarea>
+                                </div>
+                            </div>
+                            <button class="hr-action-btn hr-approve-btn" onclick="dashboard.markEmployeeLate()">
+                                ⏰ Mark as Late
+                            </button>
+                        </div>
+                        
+                        <!-- Late Attendance Records -->
+                        <div class="late-attendance-records">
+                            <h4>📋 Recent Late Attendance Records</h4>
+                            <div class="hr-filters">
+                                <input type="date" id="lateDateFilter" onchange="dashboard.filterLateRecords()" placeholder="Filter by date">
+                            </div>
+                            <div class="late-records-list" id="lateRecordsList">
+                                <!-- Late records will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -365,6 +491,49 @@
             <div class="modal-footer">
                 <button class="modal-btn secondary" onclick="closeProfileModal()">Close</button>
                 <button class="modal-btn primary" onclick="saveProfileChanges()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HR Rejection Reason Modal -->
+    <div id="hrRejectionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>❌ Reject Leave Request</h2>
+                <span class="close" onclick="closeHRRejectionModal()">&times;</span>
+            </div>
+            
+            <div class="modal-body">
+                <div class="rejection-info">
+                    <h3>Leave Request Details</h3>
+                    <div id="rejectionRequestDetails">
+                        <!-- Request details will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="rejection-form">
+                    <h3>Rejection Reason</h3>
+                    <p style="color: #6b7280; margin-bottom: 15px;">
+                        Please provide a valid reason for rejecting this leave request. 
+                        This reason will be visible to the employee.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="rejectionReason">Reason for Rejection *</label>
+                        <textarea 
+                            id="rejectionReason" 
+                            name="rejectionReason" 
+                            rows="4" 
+                            placeholder="Please provide a clear and valid reason for rejecting this leave request..."
+                            required
+                        ></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="closeHRRejectionModal()">Cancel</button>
+                <button class="modal-btn danger" onclick="dashboard.confirmRejectLeave()">Reject Leave</button>
             </div>
         </div>
     </div>
