@@ -674,32 +674,61 @@ class LeaveDashboard {
             console.log('🔔 Loading user-specific notifications...');
             
             // Get user's own leave requests for notifications
-            const response = await fetch(`${this.baseURL}/leaves/my-leaves`);
+            const leaveResponse = await fetch(`${this.baseURL}/leaves/my-leaves`);
             
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (!leaveResponse.ok) {
+                throw new Error(`HTTP ${leaveResponse.status}: ${leaveResponse.statusText}`);
             }
             
-            const userLeaves = await response.json();
+            const userLeaves = await leaveResponse.json();
+            
+            // Get user's late attendance records for notifications
+            const lateResponse = await fetch(`${this.baseURL}/api/late-attendance/my-late-records`);
+            let lateRecords = [];
+            
+            if (lateResponse.ok) {
+                const lateResult = await lateResponse.json();
+                if (lateResult.success && lateResult.data) {
+                    lateRecords = lateResult.data;
+                }
+            }
             
             // Create notifications from user's recent leave requests
-            const notifications = userLeaves
+            const leaveNotifications = userLeaves
                 .sort((a, b) => new Date(b.createdAt || b.id) - new Date(a.createdAt || a.id))
-                .slice(0, 5) // Show only 5 most recent
+                .slice(0, 3) // Show only 3 most recent leave notifications
                 .map(leave => ({
                     id: leave.id,
                     message: this.generateUserNotificationMessage(leave),
                     createdAt: leave.createdAt || new Date().toISOString(),
                     status: leave.status,
-                    leaveType: leave.leaveType
+                    leaveType: leave.leaveType,
+                    type: 'leave'
                 }));
             
-            console.log('✅ Generated ' + notifications.length + ' notifications');
+            // Create notifications from user's recent late attendance records
+            const lateNotifications = lateRecords
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 2) // Show only 2 most recent late notifications
+                .map(record => ({
+                    id: record.id,
+                    message: `You were marked as late on ${new Date(record.date).toLocaleDateString()}. Reason: ${record.reason || 'Not specified'}`,
+                    createdAt: record.date,
+                    status: 'Late',
+                    type: 'late'
+                }));
+            
+            // Combine and sort all notifications by date
+            const allNotifications = [...leaveNotifications, ...lateNotifications]
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, 5); // Show only 5 most recent total notifications
+            
+            console.log('✅ Generated ' + allNotifications.length + ' notifications');
             
             const container = document.getElementById('notificationsList');
             container.innerHTML = '';
             
-            if (notifications.length === 0) {
+            if (allNotifications.length === 0) {
                 container.innerHTML = `
                     <div class="no-data" style="text-align: center; padding: 20px; color: #64748b;">
                         <div style="font-size: 24px; margin-bottom: 10px;">🔔</div>
@@ -710,26 +739,32 @@ class LeaveDashboard {
                 return;
             }
             
-            notifications.forEach(notification => {
+            allNotifications.forEach(notification => {
                 const notificationItem = document.createElement('div');
                 notificationItem.className = 'notification-item';
                 
-                // Choose icon based on status
+                // Choose icon based on type and status
                 let icon = '📋';
                 let iconColor = '#64748b';
-                switch (notification.status) {
-                    case 'Approved':
-                        icon = '✅';
-                        iconColor = '#22c55e';
-                        break;
-                    case 'Rejected':
-                        icon = '❌';
-                        iconColor = '#ef4444';
-                        break;
-                    case 'Pending':
-                        icon = '⏳';
-                        iconColor = '#f59e0b';
-                        break;
+                
+                if (notification.type === 'late') {
+                    icon = '⏰';
+                    iconColor = '#f59e0b';
+                } else {
+                    switch (notification.status) {
+                        case 'Approved':
+                            icon = '✅';
+                            iconColor = '#22c55e';
+                            break;
+                        case 'Rejected':
+                            icon = '❌';
+                            iconColor = '#ef4444';
+                            break;
+                        case 'Pending':
+                            icon = '⏳';
+                            iconColor = '#f59e0b';
+                            break;
+                    }
                 }
                 
                 notificationItem.innerHTML = `
@@ -1487,11 +1522,29 @@ class LeaveDashboard {
     
     async loadUserAttendanceData() {
         try {
-            // For now, we'll use an empty array since we don't have a real attendance API
-            // In a real application, this would come from an attendance API
-            this.calendarData.lateDays = [];
+            console.log('⏰ Loading user attendance data...');
             
-            console.log('✅ No late days data available (attendance API not implemented)');
+            const response = await fetch(`${this.baseURL}/api/late-attendance/my-late-records`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                // Convert late attendance records to calendar format
+                this.calendarData.lateDays = result.data.map(record => ({
+                    date: new Date(record.date),
+                    reason: record.reason,
+                    notes: record.notes,
+                    markedBy: record.markedBy
+                }));
+                
+                console.log('✅ Loaded late days:', this.calendarData.lateDays.length);
+            } else {
+                console.log('ℹ️ No late attendance records found');
+                this.calendarData.lateDays = [];
+            }
             
         } catch (error) {
             console.error('Error loading attendance data:', error);
@@ -1642,7 +1695,13 @@ class LeaveDashboard {
             const lateInfo = this.calendarData.lateDays.find(late => 
                 late.date.toDateString() === date.toDateString()
             );
-            details += `⏰ Late Day\nReason: ${lateInfo.reason}`;
+            details += `⏰ Late Attendance Record\n`;
+            details += `Reason: ${lateInfo.reason || 'Not specified'}\n`;
+            if (lateInfo.notes) {
+                details += `Notes: ${lateInfo.notes}\n`;
+            }
+            details += `Marked by: ${lateInfo.markedBy || 'HR'}\n`;
+            details += `Date: ${lateInfo.date.toLocaleDateString()}`;
         }
         
         alert(details);
