@@ -13,7 +13,7 @@ document.getElementById("leaveForm").addEventListener("submit", function (e) {
 
   console.log("Submitting leave request:", leaveData); // Log the data being sent
 
-  fetch("http://localhost:8080/leaves", {
+          fetch("http://localhost:8082/leaves", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(leaveData),
@@ -34,7 +34,7 @@ document.getElementById("leaveForm").addEventListener("submit", function (e) {
 });
 
 function loadLeaves() {
-  fetch("http://localhost:8080/leaves")
+      fetch("http://localhost:8082/leaves")
     .then(res => res.json())
     .then(data => {
       const tbody = document.getElementById("leaveTableBody");
@@ -61,7 +61,7 @@ function loadLeaves() {
 }
 
 function updateStatus(id, action) {
-  fetch(`http://localhost:8080/leaves/${id}/${action}`, {
+      fetch(`http://localhost:8082/leaves/${id}/${action}`, {
     method: "PUT"
   })
     .then(() => loadLeaves())

@@ -18,6 +18,7 @@ public class User {
     private String password; // Will be encrypted
     private String fullName;
     private String department;
+    private String employeeCode;
     private Role role;
     private String profilePicture; // Path to profile picture
     
@@ -30,6 +31,16 @@ public class User {
         this.password = password;
         this.fullName = fullName;
         this.department = department;
+        this.role = role;
+    }
+    
+    public User(String username, String email, String password, String fullName, String department, String employeeCode, Role role) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.fullName = fullName;
+        this.department = department;
+        this.employeeCode = employeeCode;
         this.role = role;
     }
     
@@ -51,6 +62,9 @@ public class User {
     
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
+    
+    public String getEmployeeCode() { return employeeCode; }
+    public void setEmployeeCode(String employeeCode) { this.employeeCode = employeeCode; }
     
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }

@@ -14,6 +14,8 @@ public class LeaveRequest {
     private String id;  // MongoDB uses String IDs by default
 
     private String employeeName;
+    
+    private String employeeId; // User ID for better linking to User entity
 
     private LocalDate startDate;
 
@@ -49,6 +51,18 @@ public class LeaveRequest {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
+    
+    public LeaveRequest(String employeeName, String employeeId, LocalDate startDate, LocalDate endDate, String reason, String status) {
+        this.employeeName = employeeName;
+        this.employeeId = employeeId;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.reason = reason;
+        this.status = status;
+        this.leaveType = "Annual";
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
 
     // Getters and Setters
     public String getId() {
@@ -65,6 +79,14 @@ public class LeaveRequest {
 
     public void setEmployeeName(String employeeName) {
         this.employeeName = employeeName;
+    }
+    
+    public String getEmployeeId() {
+        return employeeId;
+    }
+
+    public void setEmployeeId(String employeeId) {
+        this.employeeId = employeeId;
     }
 
     public LocalDate getStartDate() {

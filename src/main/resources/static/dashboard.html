@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Leave Management Dashboard</title>
+    <title>LeaveEase Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="dashboard.css">
     <!-- here cdn is content deilovery network which directlt acess this page to the chart library-->
     <!-- it's like saying Hey browser! Please bring in Chart.js from the internet so I can draw charts easily.” -->
@@ -13,8 +15,12 @@
     <div class="dashboard-container">
         <!-- Header -->
         <header class="dashboard-header">
-            <h1 id="dashboardTitle">Employee Leave Management</h1>
+            <h1 id="dashboardTitle">LeaveEase Dashboard</h1>
             <div class="header-actions">
+                <button class="ai-chat-btn" onclick="openAIChat()" title="Chat with AI Assistant">
+                    <span>🤖</span>
+                    AI Assistant
+                </button>
                 <div class="user-profile" onclick="showProfile()" style="cursor: pointer;" title="Click to view profile">
                     <div class="user-avatar"></div>
                     <div class="user-info">
@@ -340,10 +346,41 @@
                 <div class="hr-management-dashboard">
                     <h2>👨‍💼 HR Management Dashboard</h2>
                     
-                    <!-- Leave Management Section -->
+                    <!-- HR Email Configuration Section -->
+                    <div class="hr-section">
+                        <h3>📧 Email Configuration</h3>
+                        <p class="section-subtitle">Configure your personal email for direct employee communication</p>
+                        
+                        <div class="email-config-section">
+                            <div class="config-status" id="emailConfigStatus">
+                                <span class="status-badge bg-warning text-dark">
+                                    <i class="fas fa-clock me-1"></i>Not Configured
+                                </span>
+                                <p class="mt-2 text-muted">Configure your email to send direct communications to employees</p>
+                            </div>
+                            
+                            <div class="config-actions">
+                                <a href="/hr-email-config.html" class="btn btn-primary">
+                                    <i class="fas fa-cog me-2"></i>Configure Email Settings
+                                </a>
+                                <button id="testEmailConfigBtn" class="btn btn-outline-success ms-2">
+                                    <i class="fas fa-paper-plane me-2"></i>Test Email
+                                </button>
+                            </div>
+                            
+                            <div class="config-benefits mt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Benefits: Employees receive emails from your personal account, can reply directly to you, professional AI-generated content
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leave Request Management Section -->
                     <div class="hr-section">
                         <h3>📋 Leave Request Management</h3>
-                        <p class="section-subtitle">Approve or reject employee leave requests</p>
+                        <p class="section-subtitle">Approve or reject employee leave requests with direct email communication</p>
                         
                         <!-- Pending Leave Requests -->
                         <div class="pending-leaves-section">
@@ -539,5 +576,14 @@
     </div>
 
     <script src="dashboard.js"></script>
+    <script>
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        function openAIChat() {
+            window.open('/ai-chat.html', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
+        }
+    </script>
 </body>
 </html>

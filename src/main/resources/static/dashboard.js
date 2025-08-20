@@ -61,10 +61,10 @@ class LeaveDashboard {
                 // Update page title for HR
                 document.title = 'HR Management Dashboard - Leave App';
             } else {
-                dashboardTitle.textContent = 'Employee Leave Management';
+                dashboardTitle.textContent = 'LeaveEase Dashboard';
                 dashboardTitle.classList.remove('hr-title');
                 // Update page title for employees
-                document.title = 'Employee Leave Management - Leave App';
+                document.title = 'LeaveEase Dashboard';
             }
         }
     }
@@ -1031,23 +1031,40 @@ class LeaveDashboard {
     
     // HR-specific methods
     async approveLeaveRequest(leaveId) {
-        if (!confirm('Are you sure you want to approve this leave request?')) {
+        if (!confirm('Are you sure you want to approve this leave request? An email will be sent directly from your email to the employee.')) {
             return;
         }
         
         try {
-            console.log('✅ Approving leave request:', leaveId);
+            console.log('✅ Approving leave request with HR direct email:', leaveId);
             
-            const response = await fetch(`${this.baseURL}/leaves/${leaveId}/approve`, {
-                method: 'PUT'
+            // Use the new HR direct approval endpoint
+            const response = await fetch(`${this.baseURL}/leaves/${leaveId}/hr-approve`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
             
-            if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
                 console.log('✅ Leave request approved successfully');
-                this.showNotification('Leave request approved successfully!', 'success');
+                console.log('📧 Email method:', result.emailMethod);
+                console.log('📧 From:', result.fromEmail);
+                console.log('📧 To:', result.toEmail);
+                
+                let message = 'Leave request approved successfully!';
+                if (result.emailMethod === 'HR Direct Email') {
+                    message += ` Email sent from your account (${result.fromEmail}) to ${result.toEmail}`;
+                } else {
+                    message += ` Email sent via system (configure your email for direct communication)`;
+                }
+                
+                this.showNotification(message, 'success');
                 this.loadHRData(); // Refresh HR data
             } else {
-                throw new Error(`Failed to approve leave request: ${response.status}`);
+                throw new Error(result.message || 'Failed to approve leave request');
             }
             
         } catch (error) {
@@ -1117,10 +1134,11 @@ class LeaveDashboard {
         }
         
         try {
-            console.log('❌ Rejecting leave request:', this.currentRejectionLeaveId);
+            console.log('❌ Rejecting leave request with HR direct email:', this.currentRejectionLeaveId);
             console.log('Reason:', rejectionReason);
             
-            const response = await fetch(`${this.baseURL}/leaves/${this.currentRejectionLeaveId}/reject`, {
+            // Use the new HR direct rejection endpoint
+            const response = await fetch(`${this.baseURL}/leaves/${this.currentRejectionLeaveId}/hr-reject`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1130,13 +1148,26 @@ class LeaveDashboard {
                 })
             });
             
-            if (response.ok) {
+            const result = await response.json();
+            
+            if (result.success) {
                 console.log('✅ Leave request rejected successfully');
-                this.showNotification('Leave request rejected successfully!', 'success');
+                console.log('📧 Email method:', result.emailMethod);
+                console.log('📧 From:', result.fromEmail);
+                console.log('📧 To:', result.toEmail);
+                
+                let message = 'Leave request rejected successfully!';
+                if (result.emailMethod === 'HR Direct Email') {
+                    message += ` Email sent from your account (${result.fromEmail}) to ${result.toEmail}`;
+                } else {
+                    message += ` Email sent via system (configure your email for direct communication)`;
+                }
+                
+                this.showNotification(message, 'success');
                 this.closeHRRejectionModal();
                 this.loadHRData(); // Refresh HR data
             } else {
-                throw new Error(`Failed to reject leave request: ${response.status}`);
+                throw new Error(result.message || 'Failed to reject leave request');
             }
             
         } catch (error) {
