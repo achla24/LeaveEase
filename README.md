@@ -121,6 +121,6 @@ Developed by Aastha Dahuja
 
 - 📧 Email: aasthadahuja07@gmail.com
 
-- 💼 LinkedIn: linkedin.com/in/aasthadahuja
+- 💼 LinkedIn: https://www.linkedin.com/in/aasthadahuja/
 
 - 🌐 Portfolio: https://preview--aastha-portfolio.lovable.app/
