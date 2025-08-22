@@ -33,11 +33,11 @@ A modern, role-based leave management platform for HR teams and employees with s
 
 ## 🏗️ Technology Stack
 
-- **Backend: Java 17, Spring Boot 3.5 (Web, Security, WebSocket, WebFlux, Validation)
-- **Database: MongoDB
-- **Email: Spring Mail (SMTP)
-- **Build Tool: Maven Wrapper (mvnw)
-- **UI: Static HTML, CSS, JavaScript served via Spring Boot
+- **Backend**: Java 17, Spring Boot 3.5 (Web, Security, WebSocket, WebFlux, Validation)
+- **Database**: MongoDB
+- **Email**: Spring Mail (SMTP)
+- **Build Tool**: Maven Wrapper (mvnw)
+- **UI**: Static HTML, CSS, JavaScript served via Spring Boot
 
 ## ⚙️ Getting Started
 ### 🔹 Prerequisites
@@ -47,11 +47,11 @@ A modern, role-based leave management platform for HR teams and employees with s
 
 ### 🔹 Installation
 
-1. **Clone the repository
-'''bash
+1. **Clone the repository**
+```bash
 git clone <repo-url>
 cd LeaveEase-main
-''' 
+```
 
 Configure environment (optional but recommended)
 Edit src/main/resources/application.properties:
