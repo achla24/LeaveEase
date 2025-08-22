@@ -38,12 +38,21 @@ A modern, role-based leave management platform for HR teams and employees with s
 - **Email**: Spring Mail (SMTP)
 - **Build Tool**: Maven Wrapper (mvnw)
 - **UI**: Static HTML, CSS, JavaScript served via Spring Boot
-
+  
+## 📡 API Endpoints  
+- `POST /auth/signup` → Register new user  
+- `POST /auth/login` → User login  
+- `POST /leave/apply` → Apply for leave  
+- `GET /leave/status` → Check leave status  
+- `PUT /leave/approve/{id}` → Approve leave (HR only)  
+- `PUT /leave/reject/{id}` → Reject leave (HR only)  
 ## ⚙️ Getting Started
+
 ### 🔹 Prerequisites
 
 -Java 17
--MongoDB 7+ (running on localhost:27017)
+-MongoDB 7+ 
+(running on localhost:27017)
 
 ### 🔹 Installation
 
@@ -53,7 +62,8 @@ git clone <repo-url>
 cd LeaveEase-main
 ```
 
-Configure environment (optional but recommended)
+2. **Configure environment (optional but recommended)**
+```
 Edit src/main/resources/application.properties:
 
 # Server
@@ -76,15 +86,16 @@ spring.mail.properties.mail.smtp.starttls.enable=true
 openai.api.key=YOUR_OPENAI_KEY
 ollama.api.url=http://localhost:11434
 
-
-Run the application
-
+```
+3. **Run the application**
+```bash
 ./mvnw spring-boot:run
 
+```
+Access the app at 👉 http://localhost:8082
 
-Access the app at 👉 http://localhost:8080
-
-📂 Project Structure
+## 📂 Project Structure
+```
 LeaveEase-main/
 ├── src/main/java/com/leaveease/...   # Backend source code
 ├── src/main/resources/               # Properties, static files
@@ -93,7 +104,23 @@ LeaveEase-main/
 ├── pom.xml                           # Maven dependencies
 ├── mvnw / mvnw.cmd                   # Maven wrapper scripts
 └── README.md                         # Project documentation
+```
 
-🧑‍💻 Contributing
+### 🙌 Acknowledgements
+
+- Inspired by real-world HR leave management systems.
+
+- Thanks to open-source community & resources used during development.
+  
+### 🧑‍💻 Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
+
+### 👩‍💻 Author
+Developed by Aastha Dahuja
+
+- 📧 Email: aasthadahuja07@gmail.com
+
+- 💼 LinkedIn: linkedin.com/in/aasthadahuja
+
+- 🌐 Portfolio: https://preview--aastha-portfolio.lovable.app/
