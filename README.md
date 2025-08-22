@@ -7,38 +7,38 @@ A modern, role-based leave management platform for HR teams and employees with s
 ### 👤 Role-Based Dashboards
 
 #### HR Panel
-- **Approve/reject leave requests with reasons
-- **View pending approvals, presence, and leave statistics
-- **Manage late attendance records
+- Approve/reject leave requests with reasons
+- View pending approvals, presence, and leave statistics
+- Manage late attendance records
 
-Employee Panel
+#### Employee Panel
 
-Submit leave requests
+- Submit leave requests
 
-Track status and history
+- Track status and history
 
-View personal attendance insights
+- View personal attendance insights
 
-🔐 Authentication & Access
+### 🔐 Authentication & Access
 
-Spring Security with role-based access control (HR, Employee)
+- Spring Security with role-based access control (HR, Employee)
 
-Secure endpoints and session handling
+- Secure endpoints and session handling
 
-✉️ Email & AI Workflows
+### ✉️ Email & AI Workflows
 
-SMTP Email via Gmail (configurable)
+- SMTP Email via Gmail(configurable)
 
-AI-Generated Emails (optional) via OpenAI or local AI (Ollama)
+- AI-Generated Emails via OpenAI or local AI (Ollama)
 
-N8N Workflow Integration (optional) for notifications
+#### N8N Workflow Integration for notifications
 
-Smart, configurable templates for HR and employee communications
+- Smart, configurable templates for HR and employee communications
 
-📦 Data & Integrations
+### 📦 Data & Integrations
 
-MongoDB persistence with auto-seeded demo data
+- MongoDB persistence with auto-seeded demo data
 
-WebSocket support for interactive features (AI chat)
+- WebSocket support for interactive features (AI chat)
 
-RESTful APIs for extensibility
+- RESTful APIs for extensibility
