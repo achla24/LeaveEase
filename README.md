@@ -119,11 +119,3 @@ You can watch the working demo of this project here:
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you’d like to change.
 
-### 👩‍💻 Author
-Developed by Aastha Dahuja
-
-- 📧 Email: aasthadahuja07@gmail.com
-
-- 💼 LinkedIn: https://www.linkedin.com/in/aasthadahuja/
-
-- 🌐 Portfolio: https://preview--aastha-portfolio.lovable.app/
